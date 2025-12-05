@@ -2,18 +2,16 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8" />
-  <title>Multi-Property Kakediagrammer</title>
+  <title>Multi-Property Kakediagrammer (4 stk)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- Trimble Connect Workspace API -->
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
-  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
     body {
       margin: 0;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-family: 'Segoe UI', sans-serif;
       background: #f8f9fa;
       color: #333;
       display: flex;
@@ -22,18 +20,18 @@
     }
     header {
       background: #fff;
-      padding: 14px 20px;
-      border-bottom: 1px solid #e2e6ea;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.07);
+      padding: 16px 20px;
+      border-bottom: 1px solid #ddd;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       gap: 16px;
     }
     .title {
-      font-size: 18px;
+      font-size: 19px;
       font-weight: 700;
-      color: #007bff;
+      color: #0069d9;
     }
     label {
       font-weight: 500;
@@ -42,9 +40,9 @@
       gap: 8px;
     }
     select, button {
-      padding: 8px 12px;
+      padding: 9px 14px;
       border-radius: 6px;
-      border: 1px solid #ced4da;
+      border: 1px solid #ccc;
       font-size: 14px;
     }
     button {
@@ -52,7 +50,6 @@
       color: white;
       border: none;
       cursor: pointer;
-      transition: background 0.2s;
     }
     button:hover { background: #0056b3; }
     button#scanButton   { background: #28a745; }
@@ -64,43 +61,36 @@
       padding: 20px;
       overflow-y: auto;
       display: grid;
-      gap: 24px;
+      gap: 28px;
       grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
       justify-items: center;
     }
     .chart-card {
       background: white;
       border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      padding: 20px;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+      padding: 24px;
       width: 100%;
-      max-width: 460px;
+      max-width: 480px;
       text-align: center;
     }
     .chart-card h3 {
-      margin: 0 0 16px 0;
-      font-size: 16px;
+      margin: 0 0 18px 0;
+      font-size: 17px;
       color: #2c3e50;
     }
-    canvas {
-      max-height: 300px;
-    }
+    canvas { max-height: 320px; }
     #status, #error {
       grid-column: 1 / -1;
       text-align: center;
       font-size: 15px;
     }
     #error { color: #e74c3c; }
-    .no-data {
-      color: #95a5a6;
-      font-style: italic;
-    }
   </style>
-</style>
 </head>
 <body>
   <header>
-    <div class="title">Multi-Property Kakediagrammer</div>
+    <div class="title">Multi-Property Kakediagrammer (opptil 4)</div>
 
     <label>
       Property Set:
@@ -109,11 +99,11 @@
       </select>
     </label>
 
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <label><input type="checkbox" id="prop1cb" /> Property 1: <select id="prop1" disabled></select></label>
-      <label><input type="checkbox" id="prop2cb" /> Property 2: <select id="prop2" disabled></select></label>
-      <label><input type="checkbox" id="prop3cb" /> Property 3: <select id="prop3" disabled></select></label>
-      <label><input type="checkbox" id="prop4cb" /> Property 4: <select id="prop4" disabled></select></label>
+    <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+      <label><input type="checkbox" id="cb1"> Property 1: <select id="prop1" disabled><option>(ingen)</option></select></label>
+      <label><input type="checkbox" id="cb2"> Property 2: <select id="prop2" disabled><option>(ingen)</option></select></label>
+      <label><input type="checkbox" id="cb3"> Property 3: <select id="prop3" disabled><option>(ingen)</option></select></label>
+      <label><input type="checkbox" id="cb4"> Property 4: <select id="prop4" disabled><option>(ingen)</option></select></label>
     </div>
 
     <button id="scanButton">Oppdater liste</button>
@@ -124,16 +114,14 @@
   <main>
     <div id="status">Kobler til Trimble Connect…</div>
     <div id="error"></div>
-    <div id="chartsContainer">
-      <!-- Diagrammer legges inn her dynamisk -->
-    </div>
+    <div id="chartsContainer"></div>
   </main>
 
   <script>
     let API = null;
-    let availableProps = {};           // pset → Set(property)
-    let charts = [];                   // Chart.js-instanser
-    let lastSelections = new Map();     // propertyNavn → selectionByState (til fargelegging)
+    let availableProps = {};
+    let charts = [];
+    let lastSelections = new Map();
 
     const COLORS = {
       withValue: "rgb(46, 204, 113)",
@@ -142,7 +130,7 @@
 
     async function connect() {
       API = await TrimbleConnectWorkspace.connect(window.parent, () => {}, 30000);
-      document.getElementById("status").textContent = "Tilkoblet – klikk «Oppdater liste».";
+      document.getElementById("status").textContent = "Tilkoblet – trykk «Oppdater liste».";
     }
 
     function clearCharts() {
@@ -153,20 +141,18 @@
     }
 
     function populatePropSelects(pset) {
-      const selects = [document.getElementById("prop1"), document.getElementById("prop2"),
-                       document.getElementById("prop3"), document.getElementById("prop4")];
-      const checkboxes = [document.getElementById("prop1cb"), document.getElementById("prop2cb"),
-                          document.getElementById("prop3cb"), document.getElementById("prop4cb")];
+      const selects = ["prop1","prop2","prop3","prop4"].map(id => document.getElementById(id));
+      const cbs = ["cb1","cb2","cb3","cb4"].map(id => document.getElementById(id));
 
       selects.forEach(s => {
         s.innerHTML = '<option value="">(ingen)</option>';
         s.disabled = true;
       });
-      checkboxes.forEach(cb => cb.checked = false);
+      cbs.forEach(cb => cb.checked = false);
 
       if (!pset || !availableProps[pset]) return;
 
-      const props = Array.from(availableProps[pset]).sort((a,b)=>a.localeCompare(b,"nb"));
+      const props = Array.from(availableProps[pset]).sort((a,b) => a.localeCompare(b,"nb"));
 
       selects.forEach(sel => {
         props.forEach(p => {
@@ -183,7 +169,7 @@
       clearCharts();
       document.getElementById("error").textContent = "";
       const status = document.getElementById("status");
-      status.textContent = "Skanner modell…";
+      status.textContent = "Skanner modell for Property Sets…";
 
       availableProps = {};
 
@@ -195,11 +181,11 @@
         if (!modelId || !objs.length) continue;
 
         const runtimeIds = objs.map(o => o.id);
-        const propsArray = await API.viewer.getObjectProperties(modelId, runtimeIds);
+        const objProps = await API.viewer.getObjectProperties(modelId, runtimeIds);
 
-        for (const obj of propsArray) {
+        for (const obj of objProps) {
           for (const pset of obj.properties || []) {
-            const name = pset.name;
+            const name = pset.name || "";
             if (!name) continue;
             if (!availableProps[name]) availableProps[name] = new Set();
             for (const p of pset.properties || []) {
@@ -209,52 +195,17 @@
         }
       }
 
-      // Fyll Pset-select
-      const psetSel = document.getElementById("psetSelect");
-      psetSel.innerHTML = '<option value="">(velg…)</option>';
+      // Fill Pset dropdown
+      const sel = document.getElementById("psetSelect");
+      sel.innerHTML = '<option value="">(velg…)</option>';
       Object.keys(availableProps).sort((a,b)=>a.localeCompare(b,"nb")).forEach(n => {
         const opt = document.createElement("option");
         opt.value = n; opt.textContent = n;
-        psetSel.appendChild(opt);
+        sel.appendChild(opt);
       });
 
-      status.textContent = "Klar – velg Property Set og opptil 4 properties.";
+      status.textContent = "Ferdig skannet – velg Property Set og huk av opptil 4 properties.";
       document.getElementById("loadButton").disabled = false;
-    }
-
-    async function loadAllCharts() {
-      clearCharts();
-      document.getElementById("error").textContent = "";
-
-      const pset = document.getElementById("psetSelect").value;
-      if (!pset) {
-        document.getElementById("error").textContent = "Velg et Property Set først.";
-        return;
-      }
-
-      const props = [];
-      for (let i=1; i<=4; i++) {
-        if (document.getElementById(`prop${i}cb`).checked) {
-          const val = document.getElementById(`prop${i}`).value;
-          if (val) props.push(val);
-        }
-      }
-
-      if (props.length === 0) {
-        document.getElementById("error").textContent = "Velg minst én property.";
-        return;
-      }
-
-      document.getElementById("status").textContent = `Henter data for ${props.length} properties…`;
-
-      for (const prop of props) {
-        const { counts, selectionByState } = await getPropertyData(pset, prop);
-        lastSelections.set(prop, selectionByState);
-        createPieChart(pset, prop, counts);
-      }
-
-      document.getElementById("status").textContent = `Ferdig – ${props.length} kakediagrammer vist.`;
-      document.getElementById("colorizeButton").disabled = false;
     }
 
     async function getPropertyData(psetName, propName) {
@@ -269,16 +220,17 @@
         if (!modelId || !objs.length) continue;
 
         const runtimeIds = objs.map(o => o.id);
-        const propsArray = await API.viewer.getObjectProperties(modelId, runtimeIds);
+        const objProps = await API.viewer.getObjectProperties(modelId, runtimeIds);
 
-        for (const obj of propsArray) {
+        for (const obj of objProps) {
           let hasProp = false, hasVal = false;
           for (const ps of obj.properties || []) {
             if (ps.name !== psetName) continue;
             for (const p of ps.properties || []) {
               if (p.name !== propName) continue;
               hasProp = true;
-              if (p.value !== null && p.value !== undefined && String(p.value).trim() !== "") hasVal = true;
+              const v = p.value;
+              if (v !== null && v !== undefined && String(v).trim() !== "") hasVal = true;
               break;
             }
             if (hasProp) break;
@@ -308,22 +260,21 @@
 
       const total = counts.withValue + counts.withoutValue;
 
-      const ctx = canvas.getContext("2d");
-      const chart = new Chart(ctx, {
+      const chart = new Chart(canvas, {
         type: "pie",
         data: {
           labels: ["Med verdi", "Uten verdi"],
           datasets: [{
-            data: [counts.withValue, counts.withValue],
+            data: [counts.withValue, counts.withoutValue],   // ← Her var feilen!
             backgroundColor: [COLORS.withValue, COLORS.withoutValue],
             borderColor: "#fff",
-            borderWidth: 2
+            borderWidth: 3
           }]
         },
         options: {
           responsive: true,
           plugins: {
-            legend: { position: "bottom" },
+            legend: { position: "bottom", labels: { font: { size: 14 } } },
             tooltip: {
               callbacks: {
                 label: ctx => {
@@ -340,33 +291,64 @@
       charts.push(chart);
     }
 
-    async function colorizeAll() {
-      if (lastSelections.size === 0) return;
+    async function loadAllCharts() {
+      clearCharts();
+      document.getElementById("error").textContent = "";
 
+      const pset = document.getElementById("psetSelect").value;
+      if (!pset) return document.getElementById("error").textContent = "Velg et Property Set";
+
+      const selectedProps = [];
+      for (let i = 1; i <= 4; i++) {
+        const cb = document.getElementById(`cb${i}`);
+        if (cb.checked) {
+          const val = document.getElementById(`prop${i}`).value;
+          if (val && val !== "(ingen)") selectedProps.push(val);
+        }
+      }
+
+      if (selectedProps.length === 0) {
+        document.getElementById("error").textContent = "Huk av minst én property";
+        return;
+      }
+
+      document.getElementById("status").textContent = `Laster ${selectedProps.length} diagrammer…`;
+
+      for (const prop of selectedProps) {
+        const { counts, selection } = await getPropertyData(pset, prop);
+        lastSelections.set(prop, selection);
+        createPieChart(pset, prop, counts);
+      }
+
+      document.getElementById("status").textContent = `${selectedProps.length} kakediagrammer ferdig!`;
+      document.getElementById("colorizeButton").disabled = false;
+    }
+
+    async function colorizeAll() {
       await API.viewer.setObjectState(undefined, { color: "reset" });
 
       for (const [prop, sel] of lastSelections) {
         for (const state of ["withValue", "withoutValue"]) {
           const perModel = sel[state];
-          const modelObjectIds = [];
+          const list = [];
           for (const modelId in perModel) {
             if (perModel[modelId].length) {
-              modelObjectIds.push({ modelId, objectRuntimeIds: perModel[modelId] });
+              list.push({ modelId, objectRuntimeIds: perModel[modelId] });
             }
           }
-          if (modelObjectIds.length === 0) continue;
+          if (list.length === 0) continue;
 
           const rgba = state === "withValue"
             ? { r:46, g:204, b:113, a:255 }
             : { r:231, g:76, b:60, a:255 };
 
-          await API.viewer.setObjectState({ modelObjectIds }, { color: rgba });
+          await API.viewer.setObjectState({ modelObjectIds: list }, { color: rgba });
         }
       }
-      document.getElementById("status").textContent = "Alle valgte properties er fargelagt i modellen.";
+      document.getElementById("status").textContent = "Alle valgte properties er fargelagt i modellen";
     }
 
-    // Event Listeners
+    // Events
     document.getElementById("scanButton").onclick = scanProperties;
     document.getElementById("loadButton").onclick = loadAllCharts;
     document.getElementById("colorizeButton").onclick = colorizeAll;
@@ -377,13 +359,9 @@
     };
 
     // Start
-    (async () => {
-      try {
-        await connect();
-      } catch (e) {
-        document.getElementById("error").textContent = "Kunne ikke koble til Trimble Connect: " + e.message;
-      }
-    })();
+    connect().catch(e => {
+      document.getElementById("error").textContent = "Kobling feilet: " + e.message;
+    });
   </script>
 </body>
 </html>
