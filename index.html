@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Property-verdi kakediagram (opptil 4)</title>
+  <title>Property-verdi kakediagram</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <!-- Trimble Connect Workspace API -->
@@ -37,6 +37,19 @@
       white-space: nowrap;
     }
 
+    header label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+
+    header select {
+      font-size: 13px;
+      padding: 2px 4px;
+      max-width: 220px;
+    }
+
     header button {
       font-size: 13px;
       padding: 4px 8px;
@@ -56,7 +69,6 @@
     #status {
       font-size: 13px;
       opacity: 0.9;
-      min-height: 18px;
     }
 
     #error {
@@ -65,85 +77,12 @@
       min-height: 18px;
     }
 
-    #configContainer {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      font-size: 13px;
-      margin-top: 4px;
-    }
-
-    .config-row {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 8px;
-      padding: 6px 8px;
-      border-radius: 6px;
-      background: #f5f5f5;
-    }
-
-    .config-label {
-      font-weight: 600;
-      margin-right: 4px;
-    }
-
-    .config-row label {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      white-space: nowrap;
-    }
-
-    .config-row select {
-      font-size: 13px;
-      padding: 2px 4px;
-      max-width: 210px;
-    }
-
-    #chartsWrapper {
+    #chartContainer {
       flex: 1;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 12px;
-      margin-top: 8px;
-    }
-
-    .chart-card {
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      padding: 8px;
       display: flex;
-      flex-direction: column;
-      gap: 6px;
-      background: #fff;
-      min-height: 220px;
-    }
-
-    .chart-card-header {
-      display: flex;
-      justify-content: space-between;
       align-items: center;
-      gap: 6px;
-      font-size: 13px;
-      flex-wrap: wrap;
-    }
-
-    .chart-title {
-      font-weight: 600;
-    }
-
-    .chart-card-header button {
-      font-size: 12px;
-      padding: 3px 8px;
-      cursor: pointer;
-      white-space: nowrap;
-    }
-
-    .chart-info {
-      font-size: 12px;
-      opacity: 0.9;
-      min-height: 16px;
+      justify-content: center;
+      min-height: 220px;
     }
 
     canvas {
@@ -156,124 +95,62 @@
 </head>
 <body>
   <header>
-    <div class="title">Property-verdi kakediagram (opptil 4)</div>
-    <button id="scanButton">Oppdater liste fra modell</button>
+    <div class="title">Property-verdi kakediagram</div>
+
+    <label>
+      Property set:
+      <select id="psetSelect">
+        <option value="">(velg…)</option>
+      </select>
+    </label>
+
+    <label>
+      Property:
+      <select id="propSelect" disabled>
+        <option value="">(velg…)</option>
+      </select>
+    </label>
+
+    <button id="scanButton">Oppdater liste</button>
     <button id="reloadButton" disabled>Hent fra modell</button>
+    <button id="colorizeButton" disabled>Fargelegg objekter</button>
   </header>
 
   <main>
     <div id="status">Kobler til Trimble Connect…</div>
-
-    <div id="configContainer">
-      <div class="config-row" data-slot="0">
-        <span class="config-label">Oppsett 1:</span>
-        <label>
-          Property set:
-          <select class="pset-select" id="psetSelect-0" data-slot="0">
-            <option value="">(velg…)</option>
-          </select>
-        </label>
-        <label>
-          Property:
-          <select class="prop-select" id="propSelect-0" data-slot="0" disabled>
-            <option value="">(velg…)</option>
-          </select>
-        </label>
-      </div>
-
-      <div class="config-row" data-slot="1">
-        <span class="config-label">Oppsett 2:</span>
-        <label>
-          Property set:
-          <select class="pset-select" id="psetSelect-1" data-slot="1">
-            <option value="">(velg…)</option>
-          </select>
-        </label>
-        <label>
-          Property:
-          <select class="prop-select" id="propSelect-1" data-slot="1" disabled>
-            <option value="">(velg…)</option>
-          </select>
-        </label>
-      </div>
-
-      <div class="config-row" data-slot="2">
-        <span class="config-label">Oppsett 3:</span>
-        <label>
-          Property set:
-          <select class="pset-select" id="psetSelect-2" data-slot="2">
-            <option value="">(velg…)</option>
-          </select>
-        </label>
-        <label>
-          Property:
-          <select class="prop-select" id="propSelect-2" data-slot="2" disabled>
-            <option value="">(velg…)</option>
-          </select>
-        </label>
-      </div>
-
-      <div class="config-row" data-slot="3">
-        <span class="config-label">Oppsett 4:</span>
-        <label>
-          Property set:
-          <select class="pset-select" id="psetSelect-3" data-slot="3">
-            <option value="">(velg…)</option>
-          </select>
-        </label>
-        <label>
-          Property:
-          <select class="prop-select" id="propSelect-3" data-slot="3" disabled>
-            <option value="">(velg…)</option>
-          </select>
-        </label>
-      </div>
+    <div id="chartContainer">
+      <canvas id="propChart"></canvas>
     </div>
-
     <div id="error"></div>
-
-    <div id="chartsWrapper">
-      <!-- Diagram-kort genereres dynamisk -->
-    </div>
   </main>
 
   <script>
     let API = null;
+    let chart = null;
 
-    // psetNavn -> Set(propertyNavn)
+    // Lagret struktur: psetNavn -> Set(propertyNavn)
     let availableProps = {};
 
-    // Alle objekt-egenskaper lagres for gjenbruk:
-    // [
-    //   { modelId, objects: [ { runtimeId, properties:[pset,...] } ] }
-    // ]
-    let lastAllObjects = null;
+    // Siste utvalg (brukes for fargelegging)
+    // { withValue: { modelId: [runtimeIds] }, withoutValue: { modelId: [runtimeIds] } }
+    let lastSelectionByState = null;
 
-    // Per slot: selectionByState
-    // withValue / withoutValue → modelId → [runtimeIds]
-    let selectionStatesBySlot = {};
-
-    // Per slot: Chart.js-instans
-    let chartInstances = {};
-
-    // Farger
+    // Farger til kakediagram og modell
     const GROUP_COLORS = {
-      withValue: "rgb(55, 130, 70)",     // Med verdi
-      withoutValue: "rgb(200, 60, 60)"   // Uten verdi
+      withValue: "rgb(55, 130, 70)",    // med verdi
+      withoutValue: "rgb(200, 60, 60)"  // uten verdi
     };
 
-    // Enkel parser for "rgb(r,g,b)" → {r,g,b,a}
     function parseRgbToRgba(rgbString) {
       if (!rgbString) return null;
-      const start = rgbString.indexOf("(");
-      const end = rgbString.indexOf(")");
-      if (start === -1 || end === -1) return null;
-      const parts = rgbString.slice(start + 1, end).split(",");
-      if (parts.length !== 3) return null;
-      const nums = parts.map(p => parseInt(p.trim(), 10));
-      if (nums.some(n => isNaN(n))) return null;
-      const [r, g, b] = nums;
-      return { r, g, b, a: 255 };
+      const match = rgbString.match(/rgb\\s*\\(\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*\\)/i);
+      if (!match) return null;
+      return {
+        r: parseInt(match[1], 10),
+        g: parseInt(match[2], 10),
+        b: parseInt(match[3], 10),
+        a: 255
+      };
     }
 
     async function connectToWorkspace() {
@@ -285,82 +162,37 @@
         30000
       );
       document.getElementById("status").textContent =
-        "Tilkoblet. Klikk «Oppdater liste fra modell».";
+        "Tilkoblet. Klikk «Oppdater liste» for å hente PropertySets fra modellen.";
     }
 
     function setButtonsEnabled(afterScan) {
+      // afterScan = true når vi har scannet property sets
       document.getElementById("reloadButton").disabled = !afterScan;
+      document.getElementById("colorizeButton").disabled = !afterScan;
     }
 
-    async function getAllObjectProperties() {
-      if (!API) throw new Error("API ikke tilkoblet.");
+    function populatePsetSelect() {
+      const psetSelect = document.getElementById("psetSelect");
+      const propSelect = document.getElementById("propSelect");
 
-      const modelObjectsList = await API.viewer.getObjects();
-      console.log("getObjects() →", modelObjectsList);
-
-      const result = [];
-
-      for (const modelObjects of modelObjectsList) {
-        const modelId =
-          modelObjects.modelId ||
-          modelObjects.modelid ||
-          modelObjects["model Id"];
-
-        const objs = modelObjects.objects || [];
-        if (!modelId || !objs.length) continue;
-
-        const runtimeIds = objs.map(o => o.id);
-        if (!runtimeIds.length) continue;
-
-        const objectPropsArray = await API.viewer.getObjectProperties(
-          modelId,
-          runtimeIds
-        );
-
-        const objects = objectPropsArray.map(obj => ({
-          runtimeId: obj.id,
-          properties: obj.properties || []
-        }));
-
-        result.push({ modelId, objects });
-      }
-
-      return result;
-    }
-
-    function populateAllPsetSelects() {
-      const psetSelects = document.querySelectorAll(".pset-select");
-      const propSelects = document.querySelectorAll(".prop-select");
-
-      // nullstill property-selects
-      propSelects.forEach(sel => {
-        sel.innerHTML = '<option value="">(velg…)</option>';
-        sel.disabled = true;
-      });
+      psetSelect.innerHTML = '<option value="">(velg…)</option>';
+      propSelect.innerHTML = '<option value="">(velg…)</option>';
+      propSelect.disabled = true;
 
       const psetNames = Object.keys(availableProps).sort((a, b) =>
         a.localeCompare(b, "nb")
       );
 
-      psetSelects.forEach(select => {
-        const prev = select.value;
-        select.innerHTML = '<option value="">(velg…)</option>';
-        for (const name of psetNames) {
-          const opt = document.createElement("option");
-          opt.value = name;
-          opt.textContent = name;
-          select.appendChild(opt);
-        }
-        if (psetNames.includes(prev)) {
-          select.value = prev;
-        }
-      });
+      for (const name of psetNames) {
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name;
+        psetSelect.appendChild(opt);
+      }
     }
 
-    function populatePropSelectForSlot(slotIndex, psetName) {
-      const propSelect = document.getElementById("propSelect-" + slotIndex);
-      if (!propSelect) return;
-
+    function populatePropSelect(psetName) {
+      const propSelect = document.getElementById("propSelect");
       propSelect.innerHTML = '<option value="">(velg…)</option>';
 
       if (!psetName || !availableProps[psetName]) {
@@ -382,6 +214,10 @@
       propSelect.disabled = false;
     }
 
+    /**
+     * Scanner modellen for å finne alle PropertySets og Properties
+     * som finnes på objektene.
+     */
     async function scanAvailableProperties() {
       if (!API) throw new Error("API ikke tilkoblet.");
 
@@ -392,11 +228,28 @@
       statusEl.textContent = "Skanner modellen for PropertySets og Properties…";
 
       availableProps = {};
-      lastAllObjects = await getAllObjectProperties();
 
-      // Bygg liste over alle PSets / Properties
-      for (const model of lastAllObjects) {
-        for (const obj of model.objects) {
+      const modelObjectsList = await API.viewer.getObjects();
+      console.log("getObjects() →", modelObjectsList);
+
+      for (const modelObjects of modelObjectsList) {
+        const modelId =
+          modelObjects.modelId ||
+          modelObjects.modelid ||
+          modelObjects["model Id"];
+
+        const objs = modelObjects.objects || [];
+        if (!modelId || !objs.length) continue;
+
+        const runtimeIds = objs.map(o => o.id);
+        if (!runtimeIds.length) continue;
+
+        const objectPropsArray = await API.viewer.getObjectProperties(
+          modelId,
+          runtimeIds
+        );
+
+        for (const obj of objectPropsArray) {
           const psets = obj.properties || [];
           for (const pset of psets) {
             const psetName = pset.name || "";
@@ -416,37 +269,73 @@
         }
       }
 
-      populateAllPsetSelects();
+      populatePsetSelect();
 
       statusEl.textContent =
-        "PropertySets og Properties er oppdatert. Velg inntil 4 oppsett og trykk «Hent fra modell».";
+        "PropertySets og Properties er oppdatert. Velg ønsket PropertySet og Property, og trykk «Hent fra modell».";
       setButtonsEnabled(true);
     }
 
-    function computeCountsForConfig(allObjects, selectedPset, selectedProp) {
-      const counts = { withValue: 0, withoutValue: 0 };
-      const selectionByState = { withValue: {}, withoutValue: {} };
+    /**
+     * Leser valgt PropertySet/Property og beregner:
+     *  - counts.withValue: objekter hvor property finnes og har verdi
+     *  - counts.withoutValue: objekter uten property, eller med tom/verdi-løs property
+     * Samtidig bygger vi struktur til fargelegging.
+     */
+    async function getPropertyValueData(selectedPset, selectedProp) {
+      if (!API) throw new Error("API ikke tilkoblet.");
 
-      for (const model of allObjects) {
-        const modelId = model.modelId;
-        for (const obj of model.objects) {
+      const counts = {
+        withValue: 0,
+        withoutValue: 0
+      };
+
+      const selectionByState = {
+        withValue: {},
+        withoutValue: {}
+      };
+
+      const modelObjectsList = await API.viewer.getObjects();
+      console.log("getObjects() for value data →", modelObjectsList);
+
+      for (const modelObjects of modelObjectsList) {
+        const modelId =
+          modelObjects.modelId ||
+          modelObjects.modelid ||
+          modelObjects["model Id"];
+
+        const objs = modelObjects.objects || [];
+        if (!modelId || !objs.length) continue;
+
+        const runtimeIds = objs.map(o => o.id);
+        if (!runtimeIds.length) continue;
+
+        const objectPropsArray = await API.viewer.getObjectProperties(
+          modelId,
+          runtimeIds
+        );
+
+        for (const obj of objectPropsArray) {
           const psets = obj.properties || [];
           let hasProperty = false;
           let hasValue = false;
 
           for (const pset of psets) {
             if (pset.name !== selectedPset) continue;
-
             const props = pset.properties || [];
+
             for (const p of props) {
               if (p.name !== selectedProp) continue;
 
               hasProperty = true;
               const v = p.value;
+
+              // "Verdi" = ikke null/undefined og ikke tom streng
               if (v !== null && v !== undefined && String(v).trim() !== "") {
                 hasValue = true;
               }
-              break;
+
+              break; // funnet property, gå videre til neste pset/objekt
             }
             if (hasProperty) break;
           }
@@ -457,9 +346,12 @@
           if (!selectionByState[stateKey][modelId]) {
             selectionByState[stateKey][modelId] = [];
           }
-          selectionByState[stateKey][modelId].push(obj.runtimeId);
+          selectionByState[stateKey][modelId].push(obj.id); // runtimeId
         }
       }
+
+      console.log("Property counts:", counts);
+      console.log("Property selectionByState:", selectionByState);
 
       return { counts, selectionByState };
     }
@@ -468,8 +360,6 @@
       if (!API) throw new Error("API ikke tilkoblet.");
 
       const statusEl = document.getElementById("status");
-      const errorEl = document.getElementById("error");
-      errorEl.textContent = "";
       statusEl.textContent = "Fargelegger objekter i modellen…";
 
       try {
@@ -481,11 +371,11 @@
           if (!perModel) continue;
 
           const modelObjectIds = [];
-          for (const modelId in perModel) {
+          for (const modelId of Object.keys(perModel)) {
             const ids = perModel[modelId];
             if (ids && ids.length) {
               modelObjectIds.push({
-                modelId: modelId,
+                modelId,
                 objectRuntimeIds: ids
               });
             }
@@ -497,7 +387,7 @@
           const rgba = parseRgbToRgba(colorString);
           if (!rgba) continue;
 
-          const selector = { modelObjectIds: modelObjectIds };
+          const selector = { modelObjectIds };
 
           await API.viewer.setObjectState(selector, {
             color: rgba
@@ -507,79 +397,13 @@
         statusEl.textContent = "Fargelegging i modellen er oppdatert.";
       } catch (err) {
         console.error("Feil ved fargelegging:", err);
-        errorEl.textContent =
+        document.getElementById("error").textContent =
           "Feil ved fargelegging av objekter: " + (err.message || err);
       }
     }
 
-    function renderPieChartForSlot(slotIndex, counts, config) {
-      const chartsWrapper = document.getElementById("chartsWrapper");
-      const pset = config.pset;
-      const prop = config.prop;
-      const total = (counts.withValue || 0) + (counts.withoutValue || 0);
-
-      let card = document.querySelector('.chart-card[data-slot="' + slotIndex + '"]');
-
-      if (!card) {
-        card = document.createElement("div");
-        card.className = "chart-card";
-        card.setAttribute("data-slot", slotIndex);
-
-        const headerDiv = document.createElement("div");
-        headerDiv.className = "chart-card-header";
-
-        const titleSpan = document.createElement("span");
-        titleSpan.className = "chart-title";
-        headerDiv.appendChild(titleSpan);
-
-        const btn = document.createElement("button");
-        btn.className = "colorize-button";
-        btn.textContent = "Fargelegg objekter";
-        btn.setAttribute("data-slot", slotIndex);
-        headerDiv.appendChild(btn);
-
-        card.appendChild(headerDiv);
-
-        const canvas = document.createElement("canvas");
-        canvas.id = "chartCanvas-" + slotIndex;
-        card.appendChild(canvas);
-
-        const infoDiv = document.createElement("div");
-        infoDiv.className = "chart-info";
-        infoDiv.id = "chartInfo-" + slotIndex;
-        card.appendChild(infoDiv);
-
-        chartsWrapper.appendChild(card);
-
-        btn.addEventListener("click", function (e) {
-          const slot = e.target.getAttribute("data-slot");
-          const selectionByState = selectionStatesBySlot[slot];
-          if (!selectionByState) {
-            document.getElementById("error").textContent =
-              "Ingen data for dette oppsettet ennå. Trykk «Hent fra modell» først.";
-            return;
-          }
-          applyPropertyColors(selectionByState);
-        });
-      }
-
-      const titleSpan = card.querySelector(".chart-title");
-      const infoDiv = card.querySelector(".chart-info");
-      const ctx = card.querySelector("canvas").getContext("2d");
-
-      titleSpan.textContent =
-        "Oppsett " + (Number(slotIndex) + 1) + ": " + pset + " / " + prop;
-
-      if (chartInstances[slotIndex]) {
-        chartInstances[slotIndex].destroy();
-      }
-
-      if (total === 0) {
-        infoDiv.textContent =
-          "Ingen objekter med valgt PropertySet/Property i modellen.";
-        chartInstances[slotIndex] = null;
-        return;
-      }
+    function renderPieChart(counts, selectedPset, selectedProp) {
+      const ctx = document.getElementById("propChart").getContext("2d");
 
       const labels = ["Med verdi", "Uten verdi"];
       const data = [counts.withValue || 0, counts.withoutValue || 0];
@@ -588,13 +412,23 @@
         GROUP_COLORS.withoutValue
       ];
 
-      chartInstances[slotIndex] = new Chart(ctx, {
+      const total = data[0] + data[1];
+
+      if (chart) chart.destroy();
+
+      if (total === 0) {
+        document.getElementById("status").textContent =
+          "Fant ingen objekter i modellen (eller ingen objekter med valgt PropertySet/Property).";
+        return;
+      }
+
+      chart = new Chart(ctx, {
         type: "pie",
         data: {
-          labels: labels,
+          labels,
           datasets: [
             {
-              data: data,
+              data,
               backgroundColor: backgroundColors
             }
           ]
@@ -609,23 +443,23 @@
                   const percent = total > 0
                     ? ((value / total) * 100).toFixed(1)
                     : 0;
-                  return label + ": " + percent + " % (" + value + " objekter)";
+                  return `${label}: ${percent} % (${value} objekter)`;
                 }
               }
             },
             legend: {
               position: "bottom",
               labels: {
-                generateLabels: function (chartInstance) {
+                generateLabels(chartInstance) {
                   const dataSet = chartInstance.data.datasets[0];
                   const labels = chartInstance.data.labels || [];
-                  return labels.map(function (label, i) {
+                  return labels.map((label, i) => {
                     const value = dataSet.data[i];
                     const percent = total > 0
                       ? ((value / total) * 100).toFixed(1)
                       : 0;
                     return {
-                      text: label + " – " + percent + " % (" + value + " objekter)",
+                      text: `${label} – ${percent} % (${value} objekter)`,
                       fillStyle: dataSet.backgroundColor[i],
                       strokeStyle: dataSet.backgroundColor[i],
                       lineWidth: 1,
@@ -640,60 +474,38 @@
         }
       });
 
-      infoDiv.textContent =
-        "Med verdi: " + counts.withValue +
-        " – Uten verdi: " + counts.withoutValue +
-        " – Totalt: " + total + " objekter.";
+      document.getElementById("status").textContent =
+        `Fordeling av objekter med/uten verdi for «${selectedPset} / ${selectedProp}». ` +
+        `Bruk «Fargelegg objekter» for å oppdatere farger i modellen.`;
     }
 
-    async function loadCharts() {
+    async function loadChart() {
       const statusEl = document.getElementById("status");
       const errorEl = document.getElementById("error");
-      const chartsWrapper = document.getElementById("chartsWrapper");
-
       errorEl.textContent = "";
-      chartsWrapper.innerHTML = "";
-      chartInstances = {};
-      selectionStatesBySlot = {};
 
-      const configs = [];
-      for (let slot = 0; slot < 4; slot++) {
-        const pset = document.getElementById("psetSelect-" + slot).value;
-        const prop = document.getElementById("propSelect-" + slot).value;
-        if (pset && prop) {
-          configs.push({ slot: slot, pset: pset, prop: prop });
-        }
-      }
+      const psetSelect = document.getElementById("psetSelect");
+      const propSelect = document.getElementById("propSelect");
 
-      if (configs.length === 0) {
-        errorEl.textContent =
-          "Velg minst én PropertySet/Property-kombinasjon før du henter fra modellen.";
+      const selectedPset = psetSelect.value;
+      const selectedProp = propSelect.value;
+
+      if (!selectedPset || !selectedProp) {
+        errorEl.textContent = "Velg både PropertySet og Property før du henter fra modellen.";
         return;
       }
 
       statusEl.textContent =
-        "Leser property-verdier for " + configs.length + " oppsett…";
+        `Henter objekter og leser «${selectedPset} / ${selectedProp}»…`;
 
       try {
-        let allObjects = lastAllObjects;
-        if (!allObjects) {
-          allObjects = await getAllObjectProperties();
-          lastAllObjects = allObjects;
-        }
+        const { counts, selectionByState } = await getPropertyValueData(
+          selectedPset,
+          selectedProp
+        );
+        lastSelectionByState = selectionByState;
 
-        for (const cfg of configs) {
-          const result = computeCountsForConfig(
-            allObjects,
-            cfg.pset,
-            cfg.prop
-          );
-          selectionStatesBySlot[cfg.slot] = result.selectionByState;
-          renderPieChartForSlot(cfg.slot, result.counts, cfg);
-        }
-
-        statusEl.textContent =
-          "Diagram oppdatert for " + configs.length +
-          " oppsett. Bruk «Fargelegg objekter» på hvert kort for å se fordelingen i modellen.";
+        renderPieChart(counts, selectedPset, selectedProp);
       } catch (err) {
         console.error(err);
         errorEl.textContent =
@@ -703,28 +515,34 @@
     }
 
     // Event handlers
-    document.getElementById("scanButton").addEventListener("click", function () {
-      scanAvailableProperties().catch(function (err) {
+    document.getElementById("scanButton").addEventListener("click", () => {
+      scanAvailableProperties().catch(err => {
         console.error(err);
         document.getElementById("error").textContent =
           "Feil ved scanning av modellen: " + (err.message || err);
       });
     });
 
-    document.getElementById("reloadButton").addEventListener("click", function () {
-      loadCharts();
+    document.getElementById("reloadButton").addEventListener("click", () => {
+      loadChart();
     });
 
-    document.querySelectorAll(".pset-select").forEach(function (select) {
-      select.addEventListener("change", function (e) {
-        const slot = e.target.getAttribute("data-slot");
-        const psetName = e.target.value;
-        populatePropSelectForSlot(slot, psetName);
-      });
+    document.getElementById("colorizeButton").addEventListener("click", async () => {
+      if (!lastSelectionByState) {
+        document.getElementById("error").textContent =
+          "Ingen data er lastet ennå. Trykk først på «Hent fra modell».";
+        return;
+      }
+      await applyPropertyColors(lastSelectionByState);
+    });
+
+    document.getElementById("psetSelect").addEventListener("change", (e) => {
+      const psetName = e.target.value;
+      populatePropSelect(psetName);
     });
 
     // Init – koble til Workspace
-    (async function () {
+    (async () => {
       try {
         await connectToWorkspace();
         setButtonsEnabled(false);
