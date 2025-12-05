@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Property-verdi kakediagram</title>
+  <title>Property-Verdi Kakediagram</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <!-- Trimble Connect Workspace API -->
@@ -15,66 +15,122 @@
     body {
       margin: 0;
       padding: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       display: flex;
       flex-direction: column;
       height: 100vh;
+      background-color: #f4f7fa;
+      color: #333;
     }
 
     header {
-      padding: 8px 12px;
-      border-bottom: 1px solid #ddd;
-      font-size: 13px;
+      padding: 12px 16px;
+      background-color: #ffffff;
+      border-bottom: 1px solid #e0e0e0;
+      font-size: 14px;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 12px;
       flex-wrap: wrap;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     }
 
     header .title {
-      font-weight: 600;
-      margin-right: 8px;
+      font-weight: 700;
+      font-size: 16px;
+      margin-right: 12px;
       white-space: nowrap;
+      color: #007bff;
     }
 
     header label {
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 6px;
       white-space: nowrap;
+      font-weight: 500;
     }
 
     header select {
-      font-size: 13px;
-      padding: 2px 4px;
-      max-width: 220px;
+      font-size: 14px;
+      padding: 6px 10px;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+      background-color: #fff;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      max-width: 250px;
+    }
+
+    header select:focus {
+      border-color: #007bff;
+      outline: none;
     }
 
     header button {
-      font-size: 13px;
-      padding: 4px 8px;
+      font-size: 14px;
+      padding: 6px 12px;
+      border: none;
+      border-radius: 4px;
       cursor: pointer;
+      transition: background-color 0.2s;
       white-space: nowrap;
+    }
+
+    header button#scanButton {
+      background-color: #28a745;
+      color: white;
+    }
+
+    header button#scanButton:hover {
+      background-color: #218838;
+    }
+
+    header button#reloadButton {
+      background-color: #007bff;
+      color: white;
+    }
+
+    header button#reloadButton:hover {
+      background-color: #0069d9;
+    }
+
+    header button#colorizeButton {
+      background-color: #ffc107;
+      color: #333;
+    }
+
+    header button#colorizeButton:hover {
+      background-color: #e0a800;
+    }
+
+    header button:disabled {
+      background-color: #6c757d;
+      color: white;
+      cursor: not-allowed;
     }
 
     main {
       flex: 1;
       display: flex;
       flex-direction: column;
-      padding: 12px;
+      padding: 16px;
       box-sizing: border-box;
-      gap: 8px;
+      gap: 12px;
+      align-items: center;
     }
 
     #status {
-      font-size: 13px;
-      opacity: 0.9;
+      font-size: 14px;
+      color: #6c757d;
+      text-align: center;
     }
 
     #error {
-      font-size: 13px;
-      color: #b00020;
-      min-height: 18px;
+      font-size: 14px;
+      color: #dc3545;
+      min-height: 20px;
+      text-align: center;
     }
 
     #chartContainer {
@@ -82,23 +138,27 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      min-height: 220px;
+      min-height: 300px;
+      width: 100%;
+      max-width: 600px;
+      background-color: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      padding: 16px;
     }
 
     canvas {
-      max-width: 480px;
-      max-height: 480px;
-      width: 100%;
-      height: auto;
+      max-width: 100%;
+      max-height: 100%;
     }
   </style>
 </head>
 <body>
   <header>
-    <div class="title">Property-verdi kakediagram</div>
+    <div class="title">Property-Verdi Kakediagram</div>
 
     <label>
-      Property set:
+      Property Set:
       <select id="psetSelect">
         <option value="">(velg…)</option>
       </select>
@@ -111,9 +171,9 @@
       </select>
     </label>
 
-    <button id="scanButton">Oppdater liste</button>
-    <button id="reloadButton" disabled>Hent fra modell</button>
-    <button id="colorizeButton" disabled>Fargelegg objekter</button>
+    <button id="scanButton">Oppdater Liste</button>
+    <button id="reloadButton" disabled>Hent fra Modell</button>
+    <button id="colorizeButton" disabled>Fargelegg Objekter</button>
   </header>
 
   <main>
@@ -135,15 +195,15 @@
     // { withValue: { modelId: [runtimeIds] }, withoutValue: { modelId: [runtimeIds] } }
     let lastSelectionByState = null;
 
-    // Farger til kakediagram og modell
+    // Farger til kakediagram og modell (oppdatert til finere farger)
     const GROUP_COLORS = {
-      withValue: "rgb(55, 130, 70)",    // med verdi
-      withoutValue: "rgb(200, 60, 60)"  // uten verdi
+      withValue: "rgb(46, 204, 113)",  // Frisk grønn for med verdi
+      withoutValue: "rgb(231, 76, 60)" // Varm rød for uten verdi
     };
 
     function parseRgbToRgba(rgbString) {
       if (!rgbString) return null;
-      const match = rgbString.match(/rgb\\s*\\(\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*\\)/i);
+      const match = rgbString.match(/rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
       if (!match) return null;
       return {
         r: parseInt(match[1], 10),
@@ -162,7 +222,7 @@
         30000
       );
       document.getElementById("status").textContent =
-        "Tilkoblet. Klikk «Oppdater liste» for å hente PropertySets fra modellen.";
+        "Tilkoblet. Klikk «Oppdater Liste» for å hente PropertySets fra modellen.";
     }
 
     function setButtonsEnabled(afterScan) {
@@ -405,7 +465,7 @@
     function renderPieChart(counts, selectedPset, selectedProp) {
       const ctx = document.getElementById("propChart").getContext("2d");
 
-      const labels = ["Med verdi", "Uten verdi"];
+      const labels = ["Med Verdi", "Uten Verdi"];
       const data = [counts.withValue || 0, counts.withoutValue || 0];
       const backgroundColors = [
         GROUP_COLORS.withValue,
@@ -429,11 +489,14 @@
           datasets: [
             {
               data,
-              backgroundColor: backgroundColors
+              backgroundColor: backgroundColors,
+              borderWidth: 1,
+              borderColor: "#ffffff"
             }
           ]
         },
         options: {
+          responsive: true,
           plugins: {
             tooltip: {
               callbacks: {
@@ -443,13 +506,16 @@
                   const percent = total > 0
                     ? ((value / total) * 100).toFixed(1)
                     : 0;
-                  return `${label}: ${percent} % (${value} objekter)`;
+                  return `${label}: ${percent}% (${value} objekter)`;
                 }
               }
             },
             legend: {
               position: "bottom",
               labels: {
+                font: {
+                  size: 14
+                },
                 generateLabels(chartInstance) {
                   const dataSet = chartInstance.data.datasets[0];
                   const labels = chartInstance.data.labels || [];
@@ -459,7 +525,7 @@
                       ? ((value / total) * 100).toFixed(1)
                       : 0;
                     return {
-                      text: `${label} – ${percent} % (${value} objekter)`,
+                      text: `${label} – ${percent}% (${value} objekter)`,
                       fillStyle: dataSet.backgroundColor[i],
                       strokeStyle: dataSet.backgroundColor[i],
                       lineWidth: 1,
@@ -476,7 +542,7 @@
 
       document.getElementById("status").textContent =
         `Fordeling av objekter med/uten verdi for «${selectedPset} / ${selectedProp}». ` +
-        `Bruk «Fargelegg objekter» for å oppdatere farger i modellen.`;
+        `Bruk «Fargelegg Objekter» for å oppdatere farger i modellen.`;
     }
 
     async function loadChart() {
