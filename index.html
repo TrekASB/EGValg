@@ -2,9 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8" />
-  <title>MultiProperty Checker
-    NORCONSULT Norge
-    Developed by Edin Dzakmic</title>
+  <title>MultiProperty Checker</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -50,7 +48,7 @@
       min-width: 300px;
     }
     .logo {
-      width: 68px;
+      width: 48px;
       height: 48px;
       border-radius: 8px;
       object-fit: contain;
@@ -58,11 +56,27 @@
       background: #fff;
       padding: 4px;
     }
+    .title-block {
+      display: flex;
+      flex-direction: column;
+    }
     .title {
       font-size: 22px;
       font-weight: 700;
       color: var(--primary);
       margin: 0;
+    }
+    .org {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--dark);
+      margin-top: -4px;
+    }
+    .dev {
+      font-size: 12px;
+      color: var(--gray);
+      margin-top: -2px;
+      font-style: italic;
     }
     .subtitle {
       font-size: 14px;
@@ -236,10 +250,15 @@
 <body>
   <header>
     <div class="title-container">
-      <!-- Logo lastes fra samme mappe som HTML-fila -->
+      <!-- Logo må ligge i samme mappe som HTML-fila -->
       <img src="norconsult-logo-black.png"
            alt="Norconsult logo" class="logo">
-      <h1 class="title">Multi-Property Kakediagrammer</h1>
+
+      <div class="title-block">
+        <h1 class="title">MultiProperty Checker</h1>
+        <div class="org">Norconsult Norge</div>
+        <div class="dev">Developed by Edin Dzakmic</div>
+      </div>
     </div>
 
     <span class="subtitle">Opptil 4 egenskaper samtidig</span>
@@ -362,7 +381,7 @@
       charts.forEach(c => c.destroy());
       charts = [];
       els.chartsContainer.innerHTML = "";
-      // Vi beholder lastSelections slik at farger kan resettes uavhengig
+      // lastSelections beholdes
     }
 
     function resetPropertySelectors() {
@@ -466,11 +485,10 @@
       }
     }
 
-    // Ny helper: hent detaljert informasjon om objekter (for CSV)
     async function getPropertyData(psetName, propName) {
       const counts = { withValue: 0, withoutValue: 0 };
-      const selection = { withValue: {}, withoutValue: {} }; // for fargelegging
-      const details = { withValue: {}, withoutValue: {} };   // for CSV-eksport
+      const selection = { withValue: {}, withoutValue: {} };
+      const details = { withValue: {}, withoutValue: {} };
 
       const models = await API.viewer.getObjects();
       if (!models || !models.length) return { counts, selection, details };
@@ -488,7 +506,7 @@
         for (const obj of objProps || []) {
           let hasProp = false;
           let hasVal = false;
-          const psetProps = {}; // alle properties fra valgt Property Set
+          const psetProps = {};
 
           for (const ps of obj.properties || []) {
             if (ps.name !== psetName) continue;
@@ -529,7 +547,6 @@
       return { counts, selection, details };
     }
 
-    // CSV helper
     function escapeCSV(value) {
       if (value === null || value === undefined) return "";
       const str = String(value);
@@ -551,7 +568,6 @@
         return;
       }
 
-      // Samle alle property-navn som forekommer i dette Property Set-et
       const allPropNamesSet = new Set();
       objects.forEach(o => {
         Object.keys(o.properties || {}).forEach(pn => allPropNamesSet.add(pn));
@@ -667,7 +683,6 @@
             animateRotate: true,
             duration: 900
           },
-          // Klikk på kakediagram -> eksport til CSV
           onClick: (evt, elements) => {
             if (!elements.length) return;
             const idx = elements[0].index;
@@ -719,7 +734,7 @@
       try {
         for (const prop of selectedProps) {
           const { counts, selection, details } = await getPropertyData(pset, prop);
-          lastSelections.set(prop, selection); // fortsatt brukt for fargelegging
+          lastSelections.set(prop, selection);
           createPieChart(pset, prop, counts, details);
         }
 
@@ -803,7 +818,6 @@
       }
     }
 
-    // Checkbox → ekstra UX (rydder verdi hvis man skrur av)
     cbIds.forEach((cbId, index) => {
       const cb = document.getElementById(cbId);
       const sel = document.getElementById(propSelectIds[index]);
@@ -815,7 +829,6 @@
       });
     });
 
-    // Events
     els.scanButton.onclick = scanProperties;
     els.loadButton.onclick = loadAllCharts;
     els.colorizeButton.onclick = colorizeAll;
@@ -829,11 +842,7 @@
       els.resetButton.disabled = true;
     };
 
-    // Start
     connect();
   </script>
 </body>
 </html>
-
-
-
