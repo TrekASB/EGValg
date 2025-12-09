@@ -179,58 +179,6 @@
       color: var(--danger);
       border: 1px solid rgba(220, 53, 69, 0.2);
     }
-
-    .object-list-panel {
-      grid-column: 1 / -1;
-      background: white;
-      border-radius: 16px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-      padding: 18px 22px;
-      max-width: 1100px;
-      width: 100%;
-      box-sizing: border-box;
-    }
-    .object-list-panel h3 {
-      margin: 0 0 4px 0;
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--dark);
-    }
-    .object-list-panel p {
-      margin: 0 0 10px 0;
-      font-size: 13px;
-      color: var(--gray);
-    }
-    .object-list-panel ul {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      max-height: 220px;
-      overflow-y: auto;
-    }
-    .object-list-item {
-      padding: 6px 10px;
-      margin-bottom: 4px;
-      border-radius: 6px;
-      background: #f8f9fa;
-      border: 1px solid #e1e4e8;
-      font-size: 13px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      cursor: pointer;
-      transition: background 0.15s ease, transform 0.1s ease;
-    }
-    .object-list-item:hover {
-      background: #e9f3ff;
-      transform: translateY(-1px);
-    }
-    .object-list-item span {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
     .footer-credit {
       grid-column: 1 / -1;
       text-align: center;
@@ -263,7 +211,7 @@
       <img src="https://norconsult.com/wp-content/uploads/2023/09/norconsult-logo-2023.svg" alt="Norconsult Logo" class="logo">
       <h1 class="title">Multi-Property Kakediagrammer</h1>
     </div>
-    <span class="subtitle">Opp til 4 properties – statistikk på IFCBUILDINGELEMENTPROXY</span>
+    <span class="subtitle">Opp til 4 properties samtidig</span>
     <label>
       Property Set:
       <select id="psetSelect">
@@ -287,106 +235,37 @@
     <div id="status">Kobler til Trimble Connect…</div>
     <div id="error"></div>
     <div id="chartsContainer"></div>
-    <div id="objectListPanel" class="object-list-panel" style="display:none;"></div>
     <div class="footer-credit">Norconsult</div>
   </main>
   <script>
     let API = null;
     let availableProps = {};
     let charts = [];
-    let lastSelections = new Map();       // key: `${pset}::${prop}` -> selection
-    let guidLookup = {};                  // key: modelId -> { runtimeId -> GUID(IFC) }
-
+    let lastSelections = new Map();
     const COLORS = {
       withValue: "rgb(46, 204, 113)",
       withoutValue: "rgb(231, 76, 60)"
     };
-
-    // Vi støtter både "Reference Object" og "Pset Reference Object", case-insensitive
-    const REF_PSET_CANDIDATES = ["Reference Object", "Pset Reference Object"];
-    const REF_PROP_NAME = "guid (ifc)";
-
     async function connect() {
       API = await TrimbleConnectWorkspace.connect(window.parent, () => {}, 30000);
       document.getElementById("status").textContent = "✅ Tilkoblet – trykk «Oppdater liste».";
     }
-
-    function clearObjectList() {
-      const panel = document.getElementById("objectListPanel");
-      panel.innerHTML = "";
-      panel.style.display = "none";
-    }
-
     function clearCharts() {
       charts.forEach(c => c.destroy());
       charts = [];
       document.getElementById("chartsContainer").innerHTML = "";
       lastSelections.clear();
-      guidLookup = {};
-      clearObjectList();
     }
-
-    // IFC-type (om tilgjengelig)
-    function getIfcType(obj) {
-      const direct = (obj.ifcType || obj.type || "").toString().toUpperCase();
-      if (direct) return direct;
-
-      if (Array.isArray(obj.properties)) {
-        for (const ps of obj.properties) {
-          for (const p of (ps.properties || [])) {
-            if (!p.name) continue;
-            const n = p.name.toLowerCase();
-            if (n.includes("ifc") && n.includes("entity")) {
-              const v = (p.value || "").toString().toUpperCase();
-              if (v) return v;
-            }
-          }
-        }
-      }
-      return "";
-    }
-
-    // Kun IFCBUILDINGELEMENTPROXY skal telles i statistikken
-    function isIfcBuildingElementProxy(obj) {
-      return getIfcType(obj) === "IFCBUILDINGELEMENTPROXY";
-    }
-
-    // GUID (IFC) fra Reference Object / Pset Reference Object, case-insensitive
-    function getReferenceGuid(obj) {
-      if (!Array.isArray(obj.properties)) return null;
-
-      const psetCandidates = REF_PSET_CANDIDATES.map(n => n.toLowerCase());
-
-      for (const ps of obj.properties) {
-        const psetName = (ps.name || "").toLowerCase();
-        if (!psetCandidates.includes(psetName)) continue;
-
-        for (const p of (ps.properties || [])) {
-          const propName = (p.name || "").toLowerCase();
-          if (propName === REF_PROP_NAME) {
-            const v = (p.value || "").toString().trim();
-            return v || null;
-          }
-        }
-      }
-      return null;
-    }
-
-    // Fyll Property 1–4 basert på valgt Pset
     function populatePropSelects(pset) {
       const selects = ["prop1","prop2","prop3","prop4"].map(id => document.getElementById(id));
       const cbs = ["cb1","cb2","cb3","cb4"].map(id => document.getElementById(id));
-
       selects.forEach(s => {
         s.innerHTML = '<option value="">(ingen)</option>';
         s.disabled = true;
       });
       cbs.forEach(cb => cb.checked = false);
-
       if (!pset || !availableProps[pset]) return;
-
       const props = Array.from(availableProps[pset]).sort((a,b) => a.localeCompare(b,"nb"));
-
       selects.forEach(sel => {
         props.forEach(p => {
           const opt = document.createElement("option");
@@ -396,37 +275,21 @@
         });
         sel.disabled = false;
       });
-
-      document.getElementById("status").textContent =
-        `Fant ${props.length} properties i «${pset}». Huk av opptil 4.`;
     }
-
-    // SCAN: bygg liste over alle Property Sets (alle objekter, som i originalen)
     async function scanProperties() {
       clearCharts();
       document.getElementById("error").textContent = "";
       const status = document.getElementById("status");
       status.textContent = "🔍 Skanner modell for Property Sets…";
-
       availableProps = {};
-      guidLookup = {};
-
       const models = await API.viewer.getObjects();
-      let modelCount = 0;
-      let objCount = 0;
-
       for (const m of models) {
         const modelId = m.modelId || m.modelid || m["model Id"];
         const objs = m.objects || [];
         if (!modelId || !objs.length) continue;
-        modelCount++;
-
         const runtimeIds = objs.map(o => o.id);
         const objProps = await API.viewer.getObjectProperties(modelId, runtimeIds);
-        objCount += objProps.length;
-
         for (const obj of objProps) {
-          // Bygg Pset-liste uten filtrering (for å sikre at dropdown fylles)
           for (const pset of obj.properties || []) {
             const name = pset.name || "";
             if (!name) continue;
@@ -437,7 +300,6 @@
           }
         }
       }
-
       const sel = document.getElementById("psetSelect");
       sel.innerHTML = '<option value="">(velg…)</option>';
       Object.keys(availableProps).sort((a,b)=>a.localeCompare(b,"nb")).forEach(n => {
@@ -445,62 +307,34 @@
         opt.value = n; opt.textContent = n;
         sel.appendChild(opt);
       });
-
-      if (Object.keys(availableProps).length === 0) {
-        status.textContent =
-          `⚠️ Fant ingen Property Sets (skannet ${modelCount} modell(er), ${objCount} objekter).`;
-      } else {
-        status.textContent =
-          `✅ Ferdig skannet – ${modelCount} modell(er), ${objCount} objekter. Velg Property Set og huk av opptil 4 properties.`;
-      }
-
+      status.textContent = "✅ Ferdig skannet – velg Property Set og huk av opptil 4 properties.";
       document.getElementById("loadButton").disabled = false;
-      document.getElementById("resetButton").disabled = true;
+      document.getElementById("resetButton").disabled = true; // Sørg for at reset er disabled etter scan
     }
-
-    // Hent data for ett Pset/Property – KUN IFCBUILDINGELEMENTPROXY
     async function getPropertyData(psetName, propName) {
       const counts = { withValue: 0, withoutValue: 0 };
       const selection = { withValue: {}, withoutValue: {} };
-
       const models = await API.viewer.getObjects();
       for (const m of models) {
         const modelId = m.modelId || m.modelid || m["model Id"];
         const objs = m.objects || [];
         if (!modelId || !objs.length) continue;
-
         const runtimeIds = objs.map(o => o.id);
         const objProps = await API.viewer.getObjectProperties(modelId, runtimeIds);
-
         for (const obj of objProps) {
-          // kun IFCBUILDINGELEMENTPROXY i statistikk
-          if (!isIfcBuildingElementProxy(obj)) continue;
-
-          // lagre GUID(IFC) fra Reference Object / Pset Reference Object
-          const refGuid = getReferenceGuid(obj);
-          if (refGuid) {
-            if (!guidLookup[modelId]) guidLookup[modelId] = {};
-            guidLookup[modelId][obj.id] = refGuid;
-          }
-
-          // sjekk property-verdi
-          let hasNonEmptyValue = false;
-
+          let hasProp = false, hasVal = false;
           for (const ps of obj.properties || []) {
             if (ps.name !== psetName) continue;
             for (const p of ps.properties || []) {
               if (p.name !== propName) continue;
+              hasProp = true;
               const v = p.value;
-              if (v !== null && v !== undefined && String(v).trim() !== "") {
-                hasNonEmptyValue = true;
-              }
+              if (v !== null && v !== undefined && String(v).trim() !== "") hasVal = true;
               break;
             }
-            if (hasNonEmptyValue) break;
+            if (hasProp) break;
           }
-
-          // objekter uten definert/verdi -> "uten verdi"
-          const key = hasNonEmptyValue ? "withValue" : "withoutValue";
+          const key = hasProp && hasVal ? "withValue" : "withoutValue";
           counts[key]++;
           if (!selection[key][modelId]) selection[key][modelId] = [];
           selection[key][modelId].push(obj.id);
@@ -508,126 +342,7 @@
       }
       return { counts, selection };
     }
-
-    async function selectAndZoom(selector, message) {
-      if (!selector || !selector.modelObjectIds || !selector.modelObjectIds.length) return;
-      try {
-        await API.viewer.setSelection(selector, "set");
-        if (API.viewer.zoomTo && typeof API.viewer.zoomTo === "function") {
-          await API.viewer.zoomTo(selector, { animationTime: 0.8 });
-        } else {
-          await API.viewer.setCamera(
-            { modelObjectIds: selector.modelObjectIds },
-            { animationTime: 0.8 }
-          );
-        }
-        if (message) {
-          document.getElementById("status").textContent = message;
-        }
-      } catch (e) {
-        document.getElementById("error").textContent = "Feil ved zoom/valg: " + e.message;
-      }
-    }
-
-    function showObjectList(pset, prop, perModel) {
-      const panel = document.getElementById("objectListPanel");
-      panel.innerHTML = "";
-
-      const allIds = [];
-      for (const modelId in perModel) {
-        const ids = perModel[modelId] || [];
-        ids.forEach(id => allIds.push({ modelId, id }));
-      }
-      const total = allIds.length;
-
-      const title = document.createElement("h3");
-      title.textContent = `${pset} → ${prop} – GUID (IFC) – ${total} IFCBUILDINGELEMENTPROXY uten verdi`;
-      panel.appendChild(title);
-
-      const info = document.createElement("p");
-      info.textContent = "Klikk på en rad for å zoome til objektet. GUID (IFC) leses fra «Reference Object / GUID (IFC)» eller «Pset Reference Object / GUID (IFC)» der den finnes.";
-      panel.appendChild(info);
-
-      if (total === 0) {
-        const empty = document.createElement("p");
-        empty.textContent = "Ingen IFCBUILDINGELEMENTPROXY uten verdi for denne property.";
-        panel.appendChild(empty);
-        panel.style.display = "block";
-        return;
-      }
-
-      const ul = document.createElement("ul");
-      allIds.forEach((entry, index) => {
-        const li = document.createElement("li");
-        li.className = "object-list-item";
-
-        const guid =
-          (guidLookup[entry.modelId] && guidLookup[entry.modelId][entry.id]) ||
-          "Mangler GUID (IFC)";
-
-        li.title = `Model: ${entry.modelId} – RuntimeId: ${entry.id} – GUID (IFC): ${guid}`;
-
-        const spanLeft = document.createElement("span");
-        spanLeft.textContent = `#${index + 1}`;
-
-        const spanRight = document.createElement("span");
-        spanRight.textContent = guid;
-
-        li.appendChild(spanLeft);
-        li.appendChild(spanRight);
-
-        li.onclick = async () => {
-          const selector = {
-            modelObjectIds: [
-              { modelId: entry.modelId, objectRuntimeIds: [entry.id] }
-            ]
-          };
-          await selectAndZoom(
-            selector,
-            `🔍 Zoomer til IFCBUILDINGELEMENTPROXY uten verdi (${pset} → ${prop})`
-          );
-        };
-
-        ul.appendChild(li);
-      });
-
-      panel.appendChild(ul);
-      panel.style.display = "block";
-    }
-
-    async function handleWithoutValueClick(key, pset, prop) {
-      const selection = lastSelections.get(key);
-      if (!selection || !selection.withoutValue) {
-        document.getElementById("error").textContent =
-          "Finner ikke lagret utvalg for objekter uten verdi.";
-        return;
-      }
-
-      const perModel = selection.withoutValue;
-      const modelObjectIds = [];
-      for (const modelId in perModel) {
-        const ids = perModel[modelId];
-        if (ids && ids.length) {
-          modelObjectIds.push({ modelId, objectRuntimeIds: ids });
-        }
-      }
-
-      if (!modelObjectIds.length) {
-        document.getElementById("status").textContent =
-          `Ingen IFCBUILDINGELEMENTPROXY uten verdi for ${pset} → ${prop}.`;
-        clearObjectList();
-        return;
-      }
-
-      const selector = { modelObjectIds };
-      await selectAndZoom(
-        selector,
-        `🔍 Markert og zoomet til alle IFCBUILDINGELEMENTPROXY uten verdi for ${pset} → ${prop}`
-      );
-      showObjectList(pset, prop, perModel);
-    }
-
-    function createPieChart(pset, prop, counts, key) {
+    function createPieChart(pset, prop, counts) {
       const container = document.getElementById("chartsContainer");
       const card = document.createElement("div");
       card.className = "chart-card";
@@ -637,9 +352,7 @@
       const canvas = document.createElement("canvas");
       card.appendChild(canvas);
       container.appendChild(card);
-
       const total = counts.withValue + counts.withoutValue;
-
       const chart = new Chart(canvas, {
         type: "pie",
         data: {
@@ -676,30 +389,16 @@
           animation: {
             animateRotate: true,
             duration: 1200
-          },
-          onClick: async (evt, elements) => {
-            if (!elements || !elements.length) return;
-            const el = elements[0];
-            const label = chart.data.labels[el.index];
-            if (label === "Uten verdi") {
-              await handleWithoutValueClick(key, pset, prop);
-            }
           }
         }
       });
       charts.push(chart);
     }
-
     async function loadAllCharts() {
       clearCharts();
       document.getElementById("error").textContent = "";
-
       const pset = document.getElementById("psetSelect").value;
-      if (!pset) {
-        document.getElementById("error").textContent = "Velg et Property Set";
-        return;
-      }
-
+      if (!pset) return document.getElementById("error").textContent = "Velg et Property Set";
       const selectedProps = [];
       for (let i = 1; i <= 4; i++) {
         const cb = document.getElementById(`cb${i}`);
@@ -712,26 +411,19 @@
         document.getElementById("error").textContent = "Huk av minst én property";
         return;
       }
-
-      document.getElementById("status").textContent =
-        `📈 Laster ${selectedProps.length} diagrammer…`;
-
+      document.getElementById("status").textContent = `📈 Laster ${selectedProps.length} diagrammer…`;
       for (const prop of selectedProps) {
         const { counts, selection } = await getPropertyData(pset, prop);
-        const key = `${pset}::${prop}`;
-        lastSelections.set(key, selection);
-        createPieChart(pset, prop, counts, key);
+        lastSelections.set(prop, selection);
+        createPieChart(pset, prop, counts);
       }
-
-      document.getElementById("status").textContent =
-        `✅ ${selectedProps.length} kakediagrammer ferdig (kun IFCBUILDINGELEMENTPROXY).`;
+      document.getElementById("status").textContent = `✅ ${selectedProps.length} kakediagrammer ferdig!`;
       document.getElementById("colorizeButton").disabled = false;
-      document.getElementById("resetButton").disabled = false;
+      document.getElementById("resetButton").disabled = false; // Aktiver reset etter lasting
     }
-
     async function colorizeAll() {
       await API.viewer.setObjectState(undefined, { color: "reset" });
-      for (const [, sel] of lastSelections) {
+      for (const [prop, sel] of lastSelections) {
         for (const state of ["withValue", "withoutValue"]) {
           const perModel = sel[state];
           const list = [];
@@ -747,24 +439,20 @@
           await API.viewer.setObjectState({ modelObjectIds: list }, { color: rgba });
         }
       }
-      document.getElementById("status").textContent =
-        "🎨 Alle valgte properties er fargelagt i modellen";
-      document.getElementById("resetButton").disabled = false;
+      document.getElementById("status").textContent = "🎨 Alle valgte properties er fargelagt i modellen";
+      document.getElementById("resetButton").disabled = false; // Sørg for at reset er aktiv etter fargelegging
     }
-
     async function resetAll() {
       clearCharts();
       await API.viewer.setObjectState(undefined, { color: "reset" });
-      document.getElementById("status").textContent =
-        "🔄 Modellen er tilbakestilt til originalfarger!";
+      document.getElementById("status").textContent = "🔄 Modellen er tilbakestilt til originalfarger!";
       document.getElementById("error").textContent = "";
       document.getElementById("loadButton").disabled = false;
       document.getElementById("colorizeButton").disabled = true;
       document.getElementById("resetButton").disabled = true;
       const pset = document.getElementById("psetSelect").value;
-      if (pset) populatePropSelects(pset);
+      populatePropSelects(pset); // Oppdater selectene hvis nødvendig
     }
-
     // Events
     document.getElementById("scanButton").onclick = scanProperties;
     document.getElementById("loadButton").onclick = loadAllCharts;
@@ -775,12 +463,11 @@
       populatePropSelects(e.target.value);
       document.getElementById("resetButton").disabled = true;
     };
-
     // Start
     connect().catch(e => {
-      document.getElementById("error").textContent =
-        "Kunne ikke koble til Trimble Connect: " + e.message;
+      document.getElementById("error").textContent = "Kunne ikke koble til Trimble Connect: " + e.message;
     });
   </script>
 </body>
 </html>
+
