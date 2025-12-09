@@ -2,23 +2,15 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8" />
-  <title>Multi-Property Objektliste</title>
+  <title>Multi-Property Objektliste (Rask versjon)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
   <style>
-    :root {
-      --primary: #0069d9;
-      --success: #28a745;
-      --danger: #e74c3c;
-      --border: #dee2e6;
-      --light-bg: #f8f9fa;
-    }
+    :root { --primary: #0069d9; --success: #28a745; --danger: #e74c3c; --border: #dee2e6; --light-bg: #f8f9fa; }
     body { margin:0; font-family:'Segoe UI',sans-serif; background:linear-gradient(135deg,#f5f7fa,#e4edf5); color:#333; display:flex; flex-direction:column; height:100vh; overflow:hidden; }
     header { background:rgba(255,255,255,0.95); backdrop-filter:blur(10px); padding:18px 24px; border-bottom:1px solid var(--border); box-shadow:0 4px 12px rgba(0,0,0,0.08); display:flex; flex-wrap:wrap; align-items:center; gap:18px; z-index:10; }
-    .title-container { display:flex; align-items:center; gap:12px; flex:1; min-width:300px; }
     .logo { width:48px; height:48px; border-radius:8px; object-fit:contain; box-shadow:0 2px 6px rgba(0,0,0,0.1); }
     .title { font-size:22px; font-weight:700; color:var(--primary); margin:0; }
-    .subtitle { font-size:14px; color:#6c757d; font-style:italic; margin-left:auto; }
     select, button { padding:10px 16px; border-radius:8px; border:1px solid var(--border); font-size:14px; transition:all .2s; }
     select { background:white; min-width:180px; }
     button { background:var(--primary); color:white; border:none; cursor:pointer; font-weight:600; display:flex; align-items:center; gap:6px; }
@@ -33,28 +25,23 @@
     #status { background:rgba(40,167,69,0.1); color:var(--success); border:1px solid rgba(40,167,69,0.2); }
     #error { background:rgba(220,53,69,0.1); color:var(--danger); border:1px solid rgba(220,53,69,0.2); }
     .result-card { background:white; border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,0.1); padding:24px; margin-bottom:30px; }
-    .result-card h3 { margin-top:0; color:var(--primary); border-bottom:2px solid var(--primary); padding-bottom:8px; }
-    .model-group { margin-bottom:24px; border:1px solid var(--border); border-radius:8px; overflow:hidden; }
-    .model-header { background:var(--light-bg); padding:12px; font-weight:600; }
-    .columns { display:flex; gap:30px; }
-    .column { flex:1; }
-    .column h4 { margin:0 0 12px; padding-bottom:6px; border-bottom:1px solid #ccc; }
-    .with-value h4 { color:var(--success); }
-    .without-value h4 { color:var(--danger); }
-    .guid-list { list-style:none; padding:0; margin:0; max-height:400px; overflow-y:auto; }
-    .guid-list li { padding:6px 0; border-bottom:1px dotted #eee; }
-    .guid-list a { color:var(--primary); text-decoration:none; font-family:monospace; font-size:13px; }
-    .guid-list a:hover { text-decoration:underline; cursor:pointer; }
-    .reference-section { margin:30px 0 10px; font-weight:600; color:var(--danger); font-size:16px; }
+    .result-card h3 { margin-top:0; color:var(--primary); }
+    table { width:100%; border-collapse:collapse; margin-top:20px; }
+    th, td { padding:12px; text-align:left; border-bottom:1px solid var(--border); }
+    th { background:var(--light-bg); }
+    .count-link { color:var(--primary); font-weight:600; cursor:pointer; text-decoration:underline; }
+    .count-link:hover { color:var(--danger); }
+    .with { color:var(--success); }
+    .without { color:var(--danger); }
+    .reference-section { margin-top:20px; font-weight:600; color:var(--danger); font-size:16px; }
   </style>
 </head>
 <body>
   <header>
     <div class="title-container">
       <img src="https://norconsult.com/wp-content/uploads/2023/09/norconsult-logo-2023.svg" alt="Norconsult Logo" class="logo">
-      <h1 class="title">Multi-Property Objektliste</h1>
+      <h1 class="title">Multi-Property Objektliste (Rask)</h1>
     </div>
-    <span class="subtitle">Opp til 4 properties samtidig</span>
     <label>Property Set: <select id="psetSelect"><option value="">(velg…)</option></select></label>
     <div class="prop-group">
       <label><input type="checkbox" id="cb1"> Property 1: <select id="prop1" disabled><option>(ingen)</option></select></label>
@@ -64,7 +51,7 @@
     </div>
     <div style="display:flex;gap:12px;">
       <button id="scanButton">🔄 Oppdater liste</button>
-      <button id="loadButton" disabled>📊 Hent objektliste</button>
+      <button id="loadButton" disabled>📊 Hent oversikt</button>
       <button id="colorizeButton" disabled>🎨 Fargelegg alle</button>
       <button id="resetButton" disabled>🔄 Tilbakestill</button>
     </div>
@@ -77,7 +64,8 @@
 
   <script>
     let API = null;
-    let modelData = []; // Lagret data fra skanning: [{modelId, modelName, objProps: [obj]}]
+    let availableProps = {};
+    let modelData = []; // For lagring av selection under lasting
     let lastSelections = new Map();
 
     async function connect() {
@@ -91,13 +79,13 @@
       modelData = [];
     }
 
-    function populatePropSelects(pset) {
+    function populatePropSelects(psetName) {
       const selects = ["prop1","prop2","prop3","prop4"].map(id => document.getElementById(id));
       const cbs = ["cb1","cb2","cb3","cb4"].map(id => document.getElementById(id));
       selects.forEach(s => { s.innerHTML = '<option value="">(ingen)</option>'; s.disabled = true; });
       cbs.forEach(cb => cb.checked = false);
-      if (!pset) return;
-      const props = Array.from(pset).sort((a,b) => a.localeCompare(b,"nb"));
+      if (!psetName || !availableProps[psetName]) return;
+      const props = Array.from(availableProps[psetName]).sort((a,b) => a.localeCompare(b,"nb"));
       selects.forEach(sel => {
         props.forEach(p => {
           const opt = document.createElement("option");
@@ -112,24 +100,26 @@
       clearResults();
       document.getElementById("error").textContent = "";
       const status = document.getElementById("status");
-      status.textContent = "🔍 Skanner modell for Property Sets og data… (kan ta litt tid)";
+      status.textContent = "🔍 Skanner Property Sets (rask skanning)…";
 
-      const availableProps = {};
-      modelData = [];
-
+      availableProps = {};
       const models = await API.viewer.getObjects();
 
+      // Kun samle Psets og properties – ingen full property henting
       for (const m of models) {
         const modelId = m.modelId || m.modelid || m["model Id"];
-        const modelName = m.name || m.filename || "Ukjent modell";
+        if (!modelId) continue;
+        // Vi hopper over full getObjectProperties her for hastighet
+        // (Vi bruker det senere kun når nødvendig)
+      }
+
+      // For å få Psets må vi dessverre hente properties – men vi gjør det minimalt
+      for (const m of models) {
+        const modelId = m.modelId || m.modelid || m["model Id"];
         const objs = m.objects || [];
         if (!modelId || !objs.length) continue;
-
-        const runtimeIds = objs.map(o => o.id);
+        const runtimeIds = objs.slice(0, 100); // Kun første 100 objekter for rask skanning av Psets!
         const objProps = await API.viewer.getObjectProperties(modelId, runtimeIds);
-
-        modelData.push({ modelId, modelName, objProps });
-
         for (const obj of objProps) {
           for (const pset of obj.properties || []) {
             const name = pset.name || "";
@@ -150,11 +140,11 @@
         sel.appendChild(opt);
       });
 
-      status.textContent = `✅ Skanning ferdig – fant ${Object.keys(availableProps).length} Property Sets. Velg og hent liste!`;
+      status.textContent = `✅ Skanning ferdig – fant ${Object.keys(availableProps).length} Property Sets. Velg og hent oversikt!`;
       document.getElementById("loadButton").disabled = false;
     }
 
-    function loadAllLists() {
+    async function loadAllLists() {
       clearResults();
       const pset = document.getElementById("psetSelect").value;
       if (!pset) return document.getElementById("error").textContent = "Velg Property Set";
@@ -169,73 +159,146 @@
       }
       if (selectedProps.length === 0) return document.getElementById("error").textContent = "Huk av minst én property";
 
-      document.getElementById("status").textContent = `📊 Genererer lister for ${selectedProps.length} properties…`;
+      document.getElementById("status").textContent = `📊 Henter data (kan ta tid i store modeller)…`;
 
       const container = document.getElementById("resultsContainer");
+      const table = document.createElement("table");
+      table.innerHTML = `<thead><tr><th>Property</th><th>Med verdi</th><th>Uten verdi (klikk for isolering)</th></tr></thead><tbody></tbody>`;
+      const tbody = table.querySelector("tbody");
 
-      selectedProps.forEach(prop => {
-        const selection = { withValue: {}, withoutValue: [] };
-
-        modelData.forEach(({modelId, modelName, objProps}) => {
-          selection.withValue[modelId] = { ids: [], modelName };
-
-          objProps.forEach(obj => {
-            let hasProp = false;
-            let hasValue = false;
-
-            for (const ps of obj.properties || []) {
-              if (ps.name !== pset) continue;
-              for (const p of ps.properties || []) {
-                if (p.name === prop) {
-                  hasProp = true;
-                  const v = p.value;
-                  if (v !== null && v !== undefined && String(v).trim() !== "") hasValue = true;
-                  break;
-                }
-              }
-              if (hasProp) break;
-            }
-
-            if (hasProp && hasValue) {
-              selection.withValue[modelId].ids.push(obj.id);
-            } else if (hasProp) {
-              selection.withoutValue.push({
-                modelId,
-                modelName,
-                runtimeId: obj.id,
-                guid: obj.globalId || "Ukjent GUID"
-              });
-            }
-          });
-        });
-
+      for (const prop of selectedProps) {
+        const { counts, selection } = await getPropertyData(pset, prop); // Full henting her
         lastSelections.set(prop, selection);
-        createPropertyTable(container, pset, prop, selection);
+
+        const row = document.createElement("tr");
+        row.innerHTML = `<td><strong>${prop}</strong></td>
+          <td class="with">${counts.withValue}</td>
+          <td class="without"><span class="count-link" data-prop="${prop}">${counts.withoutValue}</span></td>`;
+        tbody.appendChild(row);
+      }
+
+      container.appendChild(table);
+
+      // Klikk på uten verdi-tall for isolering
+      container.querySelectorAll(".count-link").forEach(link => {
+        link.onclick = async () => {
+          const prop = link.dataset.prop;
+          const sel = lastSelections.get(prop);
+          // Isolér uten verdi
+          const list = [];
+          const modelMap = {};
+          sel.withoutValue.forEach(o => {
+            if (!modelMap[o.modelId]) modelMap[o.modelId] = [];
+            modelMap[o.modelId].push(o.runtimeId);
+          });
+          for (const modelId in modelMap) {
+            list.push({ modelId, objectRuntimeIds: modelMap[modelId] });
+          }
+          await API.viewer.isolateEntities(list);
+          document.getElementById("status").textContent = `🔍 Isolert ${sel.withoutValue.length} objekter uten verdi for "${prop}"`;
+        };
       });
 
-      document.getElementById("status").textContent = `✅ Ferdig – lister generert!`;
+      // Pset Reference Object
+      const ref = document.createElement("div");
+      ref.className = "reference-section";
+      ref.textContent = "Pset Reference Object – Klikk på tall i 'Uten verdi' for isolering av objekter uten verdi.";
+      container.appendChild(ref);
+
+      document.getElementById("status").textContent = "✅ Oversikt ferdig! Klikk på tall for isolering.";
       document.getElementById("colorizeButton").disabled = false;
       document.getElementById("resetButton").disabled = false;
     }
 
-    // createPropertyTable, colorizeAll, resetAll samme som før (bruk lastSelections)
-    // (Kopier fra forrige versjon – de er identiske)
+    // getPropertyData, colorizeAll, resetAll fra forrige (med full henting, men kun når du trykker "Hent oversikt")
 
-    // ... (createPropertyTable, colorizeAll, showWithoutValueList erstattes ikke her for plass, men behold fra forrige kode)
+    async function getPropertyData(psetName, propName) {
+      const counts = { withValue: 0, withoutValue: 0 };
+      const selection = { withValue: {}, withoutValue: [] };
 
-    // Events
+      const models = await API.viewer.getObjects();
+
+      for (const m of models) {
+        const modelId = m.modelId || m.modelid || m["model Id"];
+        const modelName = m.name || m.filename || "Ukjent";
+        const objs = m.objects || [];
+        if (!modelId || !objs.length) continue;
+
+        const runtimeIds = objs.map(o => o.id);
+        const objProps = await API.viewer.getObjectProperties(modelId, runtimeIds);
+
+        for (const obj of objProps) {
+          let hasProp = false;
+          let hasValue = false;
+
+          for (const ps of obj.properties || []) {
+            if (ps.name !== psetName) continue;
+            for (const p of ps.properties || []) {
+              if (p.name === propName) {
+                hasProp = true;
+                const v = p.value;
+                if (v !== null && v !== undefined && String(v).trim() !== "") hasValue = true;
+                break;
+              }
+            }
+            if (hasProp) break;
+          }
+
+          const key = hasProp && hasValue ? "withValue" : "withoutValue";
+          counts[key]++;
+
+          if (key === "withValue") {
+            if (!selection.withValue[modelId]) selection.withValue[modelId] = [];
+            selection.withValue[modelId].push(obj.id);
+          } else if (hasProp) {
+            selection.withoutValue.push({
+              modelId,
+              modelName,
+              runtimeId: obj.id,
+              guid: obj.globalId || "Ukjent"
+            });
+          }
+        }
+      }
+      return { counts, selection };
+    }
+
+    async function colorizeAll() {
+      await API.viewer.setObjectState(undefined, { color: "reset" });
+      for (const [prop, sel] of lastSelections) {
+        // Grønn med verdi
+        for (const modelId in sel.withValue) {
+          await API.viewer.setObjectState({ modelObjectIds: [{ modelId, objectRuntimeIds: sel.withValue[modelId] }] }, { color: { r:46, g:204, b:113, a:255 } });
+        }
+        // Rød uten verdi
+        const map = {};
+        sel.withoutValue.forEach(o => {
+          if (!map[o.modelId]) map[o.modelId] = [];
+          map[o.modelId].push(o.runtimeId);
+        });
+        for (const modelId in map) {
+          await API.viewer.setObjectState({ modelObjectIds: [{ modelId, objectRuntimeIds: map[modelId] }] }, { color: { r:231, g:76, b:60, a:255 } });
+        }
+      }
+      document.getElementById("status").textContent = "🎨 Fargelagt (grønn=med, rød=uten)";
+    }
+
+    async function resetAll() {
+      clearResults();
+      await API.viewer.setObjectState(undefined, { color: "reset" });
+      await API.viewer.isolateEntities([]);
+      document.getElementById("status").textContent = "🔄 Tilbakestilt";
+      document.getElementById("colorizeButton").disabled = true;
+      document.getElementById("resetButton").disabled = true;
+    }
+
     document.getElementById("scanButton").onclick = scanProperties;
     document.getElementById("loadButton").onclick = loadAllLists;
     document.getElementById("colorizeButton").onclick = colorizeAll;
     document.getElementById("resetButton").onclick = resetAll;
-    document.getElementById("psetSelect").onchange = e => {
-      clearResults();
-      // populatePropSelects trenger nå availableProps[pset] – legg til global availableProps fra scan
-    };
+    document.getElementById("psetSelect").onchange = e => populatePropSelects(e.target.value);
 
-    connect().catch(e => {
-      document.getElementById("error").textContent = "Kunne ikke koble til: " + e.message;
-    });
+    connect().catch(e => document.getElementById("error").textContent = "Feil: " + e.message);
   </script>
 </body>
 </html>
