@@ -187,6 +187,32 @@
       margin-top: 16px;
       font-style: italic;
     }
+    .object-table {
+      margin-top: 20px;
+      overflow: auto;
+      max-height: 200px;
+      display: none;
+    }
+    .object-table table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .object-table th, .object-table td {
+      border: 1px solid var(--border);
+      padding: 8px;
+      text-align: left;
+    }
+    .object-table th {
+      background: #f2f2f2;
+      font-weight: 600;
+    }
+    .object-table a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+    .object-table a:hover {
+      text-decoration: underline;
+    }
     @media (max-width: 768px) {
       header {
         flex-direction: column;
@@ -309,7 +335,7 @@
       });
       status.textContent = "✅ Ferdig skannet – velg Property Set og huk av opptil 4 properties.";
       document.getElementById("loadButton").disabled = false;
-      document.getElementById("resetButton").disabled = true; // Sørg for at reset er disabled etter scan
+      document.getElementById("resetButton").disabled = true;
     }
     async function getPropertyData(psetName, propName) {
       const counts = { withValue: 0, withoutValue: 0 };
@@ -323,21 +349,27 @@
         const objProps = await API.viewer.getObjectProperties(modelId, runtimeIds);
         for (const obj of objProps) {
           let hasProp = false, hasVal = false;
+          let guid = null;
           for (const ps of obj.properties || []) {
-            if (ps.name !== psetName) continue;
             for (const p of ps.properties || []) {
-              if (p.name !== propName) continue;
-              hasProp = true;
-              const v = p.value;
-              if (v !== null && v !== undefined && String(v).trim() !== "") hasVal = true;
-              break;
+              if (p.name === 'GlobalId') {
+                guid = p.value;
+              }
+              if (p.name === propName) {
+                hasProp = true;
+                const v = p.value;
+                if (v !== null && v !== undefined && String(v).trim() !== "") hasVal = true;
+              }
             }
-            if (hasProp) break;
           }
           const key = hasProp && hasVal ? "withValue" : "withoutValue";
           counts[key]++;
           if (!selection[key][modelId]) selection[key][modelId] = [];
-          selection[key][modelId].push(obj.id);
+          if (key === "withValue") {
+            selection[key][modelId].push(obj.id);
+          } else {
+            selection[key][modelId].push({ runtimeId: obj.id, guid: guid || 'Ukjent' });
+          }
         }
       }
       return { counts, selection };
@@ -389,6 +421,11 @@
           animation: {
             animateRotate: true,
             duration: 1200
+          },
+          onClick: async (evt, elements) => {
+            if (elements.length > 0 && elements[0].index === 1) { // Uten verdi
+              await showWithoutValue(prop, card);
+            }
           }
         }
       });
@@ -419,7 +456,7 @@
       }
       document.getElementById("status").textContent = `✅ ${selectedProps.length} kakediagrammer ferdig!`;
       document.getElementById("colorizeButton").disabled = false;
-      document.getElementById("resetButton").disabled = false; // Aktiver reset etter lasting
+      document.getElementById("resetButton").disabled = false;
     }
     async function colorizeAll() {
       await API.viewer.setObjectState(undefined, { color: "reset" });
@@ -428,8 +465,9 @@
           const perModel = sel[state];
           const list = [];
           for (const modelId in perModel) {
-            if (perModel[modelId].length) {
-              list.push({ modelId, objectRuntimeIds: perModel[modelId] });
+            const ids = state === "withValue" ? perModel[modelId] : perModel[modelId].map(o => o.runtimeId);
+            if (ids.length) {
+              list.push({ modelId, objectRuntimeIds: ids });
             }
           }
           if (list.length === 0) continue;
@@ -440,18 +478,73 @@
         }
       }
       document.getElementById("status").textContent = "🎨 Alle valgte properties er fargelagt i modellen";
-      document.getElementById("resetButton").disabled = false; // Sørg for at reset er aktiv etter fargelegging
+      document.getElementById("resetButton").disabled = false;
+    }
+    async function showWithoutValue(prop, card) {
+      const sel = lastSelections.get(prop).withoutValue;
+      if (!sel) return;
+      const modelEntities = [];
+      const objects = [];
+      for (const modelId in sel) {
+        const objs = sel[modelId];
+        modelEntities.push({ modelId, objectRuntimeIds: objs.map(o => o.runtimeId) });
+        objs.forEach(o => objects.push({ modelId, runtimeId: o.runtimeId, guid: o.guid }));
+      }
+      if (modelEntities.length === 0) return;
+      await API.viewer.isolateEntities(modelEntities);
+      // Lag tabell
+      let tableContainer = card.querySelector('.object-table');
+      if (!tableContainer) {
+        tableContainer = document.createElement('div');
+        tableContainer.className = 'object-table';
+        card.appendChild(tableContainer);
+      }
+      tableContainer.innerHTML = '';
+      const table = document.createElement('table');
+      const thead = document.createElement('thead');
+      thead.innerHTML = '<tr><th>GUID (klikk for zoom)</th></tr>';
+      table.appendChild(thead);
+      const tbody = document.createElement('tbody');
+      objects.sort((a, b) => a.guid.localeCompare(b.guid));
+      for (const obj of objects) {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        const a = document.createElement('a');
+        a.href = '#';
+        a.textContent = obj.guid;
+        a.onclick = async (e) => {
+          e.preventDefault();
+          await zoomToObject(obj.modelId, obj.runtimeId);
+        };
+        td.appendChild(a);
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+      }
+      table.appendChild(tbody);
+      tableContainer.appendChild(table);
+      tableContainer.style.display = 'block';
+      document.getElementById("status").textContent = `🔍 Isolert og listet objekter uten verdi for ${prop}`;
+    }
+    async function zoomToObject(modelId, runtimeId) {
+      const selector = { modelObjectIds: [{ modelId, objectRuntimeIds: [runtimeId] }] };
+      await API.viewer.setCamera(selector);
+      document.getElementById("status").textContent = "🔎 Zoomet til valgt objekt";
     }
     async function resetAll() {
       clearCharts();
       await API.viewer.setObjectState(undefined, { color: "reset" });
+      await API.viewer.isolateEntities([]); // Vis alle igjen
+      document.querySelectorAll('.object-table').forEach(t => {
+        t.innerHTML = '';
+        t.style.display = 'none';
+      });
       document.getElementById("status").textContent = "🔄 Modellen er tilbakestilt til originalfarger!";
       document.getElementById("error").textContent = "";
       document.getElementById("loadButton").disabled = false;
       document.getElementById("colorizeButton").disabled = true;
       document.getElementById("resetButton").disabled = true;
       const pset = document.getElementById("psetSelect").value;
-      populatePropSelects(pset); // Oppdater selectene hvis nødvendig
+      populatePropSelects(pset);
     }
     // Events
     document.getElementById("scanButton").onclick = scanProperties;
