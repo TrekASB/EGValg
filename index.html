@@ -41,7 +41,7 @@
     .object-table th { background:#f8f9fa; font-weight:600; }
     .object-table a { color:var(--primary); text-decoration:none; font-family:monospace; font-size:13px; }
     .object-table a:hover { text-decoration:underline; cursor:pointer; }
-    .reference-section { margin-top: 15px; font-size: 14px; color: #555; }
+    .reference-section { margin-top: 15px; font-weight:600; color: var(--danger); }
   </style>
 </head>
 <body>
@@ -50,7 +50,7 @@
       <img src="https://norconsult.com/wp-content/uploads/2023/09/norconsult-logo-2023.svg" alt="Norconsult Logo" class="logo">
       <h1 class="title">Multi-Property Kakediagrammer</h1>
     </div>
-    <span class="subtitle">Opp til 4 properties samtidig (kun IFCBUILDINGELEMENTPROXY)</span>
+    <span class="subtitle">Opp til 4 properties samtidig</span>
     <label>Property Set: <select id="psetSelect"><option value="">(velg…)</option></select></label>
     <div class="prop-group">
       <label><input type="checkbox" id="cb1"> Property 1: <select id="prop1" disabled><option>(ingen)</option></select></label>
@@ -116,7 +116,7 @@
       clearCharts();
       document.getElementById("error").textContent = "";
       const status = document.getElementById("status");
-      status.textContent = "🔍 Skanner modell for Property Sets på IfcBuildingElementProxy…";
+      status.textContent = "🔍 Skanner modell for Property Sets på objekter…";
 
       availableProps = {};
       psetUsageCount = {};
@@ -132,9 +132,6 @@
         const objProps = await API.viewer.getObjectProperties(modelId, runtimeIds);
 
         for (const obj of objProps) {
-          // Filtrer kun IfcBuildingElementProxy
-          if (obj.ifcType !== 'IfcBuildingElementProxy') continue;
-
           for (const pset of obj.properties || []) {
             const name = pset.name || "";
             if (!name) continue;
@@ -150,23 +147,33 @@
         }
       }
 
-      const minUsage = 10;
-      const relevantPsets = Object.keys(availableProps).filter(name => (psetUsageCount[name] || 0) >= minUsage);
+      const minUsage = 20; // Økt for bedre filtrering av elementnivå
+      let relevantPsets = Object.keys(availableProps).filter(name => (psetUsageCount[name] || 0) >= minUsage);
 
       const sel = document.getElementById("psetSelect");
       sel.innerHTML = '<option value="">(velg…)</option>';
+
+      if (relevantPsets.length === 0) {
+        // Fallback: Vis alle hvis ingen etter filtrering
+        relevantPsets = Object.keys(availableProps);
+        status.textContent = `⚠️ Fant ingen Psets med >${minUsage} objekter – viser alle (${relevantPsets.length} totale).`;
+      }
+
       relevantPsets.sort((a,b) => a.localeCompare(b,"nb")).forEach(n => {
         const opt = document.createElement("option");
         opt.value = n;
-        opt.textContent = `${n} (${psetUsageCount[n]} proxy-objekter)`;
+        opt.textContent = `${n} (${psetUsageCount[n]} objekter)`;
         sel.appendChild(opt);
       });
 
-      status.textContent = `✅ Ferdig skannet – fant ${relevantPsets.length} relevante Property Sets på IfcBuildingElementProxy.`;
+      if (relevantPsets.length > 0) {
+        status.textContent = `✅ Ferdig skannet – fant ${relevantPsets.length} relevante Property Sets på objektnivå.`;
+      }
       document.getElementById("loadButton").disabled = false;
       document.getElementById("resetButton").disabled = true;
     }
 
+    // getPropertyData og resten er uendret fra forrige (uten streng ifcType-filter)
     async function getPropertyData(psetName, propName) {
       const counts = { withValue: 0, withoutValue: 0 };
       const selection = { withValue: {}, withoutValue: [] };
@@ -182,9 +189,6 @@
         const objProps = await API.viewer.getObjectProperties(modelId, runtimeIds);
 
         for (const obj of objProps) {
-          // Filtrer kun IfcBuildingElementProxy
-          if (obj.ifcType !== 'IfcBuildingElementProxy') continue;
-
           let hasProp = false;
           let hasValue = false;
 
@@ -219,7 +223,9 @@
       return { counts, selection };
     }
 
+    // createPieChart, loadAllCharts, colorizeAll, showWithoutValueList og resetAll er samme som før
     function createPieChart(pset, prop, counts, withoutValueObjects) {
+      // ... samme som i forrige versjon
       const container = document.getElementById("chartsContainer");
       const card = document.createElement("div");
       card.className = "chart-card";
@@ -257,6 +263,7 @@
     }
 
     async function loadAllCharts() {
+      // ... samme som før
       clearCharts();
       document.getElementById("error").textContent = "";
       const pset = document.getElementById("psetSelect").value;
@@ -286,6 +293,7 @@
     }
 
     async function colorizeAll() {
+      // ... samme som før
       await API.viewer.setObjectState(undefined, { color: "reset" });
 
       for (const [prop, sel] of lastSelections) {
@@ -318,6 +326,7 @@
     }
 
     async function showWithoutValueList(prop, card, objects) {
+      // ... samme som før, med "Pset Reference Object"
       const isolateList = [];
       const modelMap = {};
       objects.forEach(o => {
@@ -336,10 +345,10 @@
         card.appendChild(tableDiv);
       }
 
-      // Ny: Pset Reference Object-seksjon
       const referenceSection = document.createElement('div');
       referenceSection.className = 'reference-section';
-      referenceSection.textContent = 'Pset Reference Object (GUID-referanser for objekter uten verdi):';
+      referenceSection.textContent = 'Pset Reference Object – GUID-referanser for objekter uten verdi:';
+      tableDiv.innerHTML = '';
       tableDiv.appendChild(referenceSection);
 
       tableDiv.innerHTML += `<table>
@@ -367,7 +376,7 @@
       });
 
       tableDiv.style.display = 'block';
-      document.getElementById("status").textContent = `🔍 Isolert ${objects.length} IfcBuildingElementProxy-objekter uten verdi for "${prop}"`;
+      document.getElementById("status").textContent = `🔍 Isolert ${objects.length} objekter uten verdi for "${prop}"`;
     }
 
     async function resetAll() {
