@@ -105,14 +105,8 @@
     }
     button#scanButton { background: var(--success); }
     button#scanButton:hover:not(:disabled) { background: #218838; }
-    button#resetButton {
-      background: var(--warning);
-      color: #333;
-    }
-    button#resetButton:hover:not(:disabled) {
-      background: #e0a800;
-      color: #333;
-    }
+    button#resetButton { background: var(--danger); }
+    button#resetButton:hover:not(:disabled) { background: #c0392b; }
     button:disabled {
       background: var(--gray);
       cursor: not-allowed;
@@ -234,7 +228,7 @@
       <button id="scanButton">🔄 Oppdater liste</button>
       <button id="loadButton" disabled>📊 Hent diagrammer</button>
       <button id="colorizeButton" disabled>🎨 Fargelegg alle</button>
-      <button id="resetButton">🔄 Tilbakestill</button>
+      <button id="resetButton" disabled>🔄 Tilbakestill</button>
     </div>
   </header>
   <main>
@@ -315,6 +309,7 @@
       });
       status.textContent = "✅ Ferdig skannet – velg Property Set og huk av opptil 4 properties.";
       document.getElementById("loadButton").disabled = false;
+      document.getElementById("resetButton").disabled = true; // Sørg for at reset er disabled etter scan
     }
     async function getPropertyData(psetName, propName) {
       const counts = { withValue: 0, withoutValue: 0 };
@@ -424,7 +419,7 @@
       }
       document.getElementById("status").textContent = `✅ ${selectedProps.length} kakediagrammer ferdig!`;
       document.getElementById("colorizeButton").disabled = false;
-      document.getElementById("resetButton").disabled = false;
+      document.getElementById("resetButton").disabled = false; // Aktiver reset etter lasting
     }
     async function colorizeAll() {
       await API.viewer.setObjectState(undefined, { color: "reset" });
@@ -445,41 +440,18 @@
         }
       }
       document.getElementById("status").textContent = "🎨 Alle valgte properties er fargelagt i modellen";
+      document.getElementById("resetButton").disabled = false; // Sørg for at reset er aktiv etter fargelegging
     }
     async function resetAll() {
-      // Nullstill alle verdier
-      document.getElementById("psetSelect").value = "";
-      const selects = ["prop1","prop2","prop3","prop4"].map(id => document.getElementById(id));
-      const cbs = ["cb1","cb2","cb3","cb4"].map(id => document.getElementById(id));
-      
-      selects.forEach(s => {
-        s.value = "";
-        s.innerHTML = '<option value="">(ingen)</option>';
-        s.disabled = true;
-      });
-      
-      cbs.forEach(cb => cb.checked = false);
-      
-      // Fjern alle diagrammer
       clearCharts();
-      
-      // Tilbakestill modellfarger
-      try {
-        await API.viewer.setObjectState(undefined, { color: "reset" });
-        document.getElementById("status").textContent = "🔄 Alt er tilbakestilt - modell og valg er nullstilt";
-      } catch (error) {
-        document.getElementById("error").textContent = "Feil ved tilbakestilling: " + error.message;
-        return;
-      }
-      
-      // Deaktiver knapper
-      document.getElementById("loadButton").disabled = true;
+      await API.viewer.setObjectState(undefined, { color: "reset" });
+      document.getElementById("status").textContent = "🔄 Modellen er tilbakestilt til originalfarger!";
+      document.getElementById("error").textContent = "";
+      document.getElementById("loadButton").disabled = false;
       document.getElementById("colorizeButton").disabled = true;
       document.getElementById("resetButton").disabled = true;
-      
-      // Rydde opp i data
-      availableProps = {};
-      lastSelections.clear();
+      const pset = document.getElementById("psetSelect").value;
+      populatePropSelects(pset); // Oppdater selectene hvis nødvendig
     }
     // Events
     document.getElementById("scanButton").onclick = scanProperties;
@@ -489,6 +461,7 @@
     document.getElementById("psetSelect").onchange = e => {
       clearCharts();
       populatePropSelects(e.target.value);
+      document.getElementById("resetButton").disabled = true;
     };
     // Start
     connect().catch(e => {
