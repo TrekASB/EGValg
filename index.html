@@ -179,6 +179,59 @@
       color: var(--danger);
       border: 1px solid rgba(220, 53, 69, 0.2);
     }
+
+    /* Liste over objekter uten verdi */
+    .object-list-panel {
+      grid-column: 1 / -1;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+      padding: 18px 22px;
+      max-width: 1100px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .object-list-panel h3 {
+      margin: 0 0 4px 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--dark);
+    }
+    .object-list-panel p {
+      margin: 0 0 10px 0;
+      font-size: 13px;
+      color: var(--gray);
+    }
+    .object-list-panel ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+    .object-list-item {
+      padding: 6px 10px;
+      margin-bottom: 4px;
+      border-radius: 6px;
+      background: #f8f9fa;
+      border: 1px solid #e1e4e8;
+      font-size: 13px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.1s ease;
+    }
+    .object-list-item:hover {
+      background: #e9f3ff;
+      transform: translateY(-1px);
+    }
+    .object-list-item span {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     .footer-credit {
       grid-column: 1 / -1;
       text-align: center;
@@ -186,32 +239,6 @@
       color: #888;
       margin-top: 16px;
       font-style: italic;
-    }
-    .object-table {
-      margin-top: 20px;
-      overflow: auto;
-      max-height: 200px;
-      display: none;
-    }
-    .object-table table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    .object-table th, .object-table td {
-      border: 1px solid var(--border);
-      padding: 8px;
-      text-align: left;
-    }
-    .object-table th {
-      background: #f2f2f2;
-      font-weight: 600;
-    }
-    .object-table a {
-      color: var(--primary);
-      text-decoration: none;
-    }
-    .object-table a:hover {
-      text-decoration: underline;
     }
     @media (max-width: 768px) {
       header {
@@ -261,27 +288,41 @@
     <div id="status">Kobler til Trimble Connect…</div>
     <div id="error"></div>
     <div id="chartsContainer"></div>
+    <!-- Panel for liste over objekter uten verdi -->
+    <div id="objectListPanel" class="object-list-panel" style="display:none;"></div>
     <div class="footer-credit">Norconsult</div>
   </main>
   <script>
     let API = null;
     let availableProps = {};
     let charts = [];
+    // nøkkel: `${pset}::${prop}` -> selection-objekt
     let lastSelections = new Map();
+
     const COLORS = {
       withValue: "rgb(46, 204, 113)",
       withoutValue: "rgb(231, 76, 60)"
     };
+
     async function connect() {
       API = await TrimbleConnectWorkspace.connect(window.parent, () => {}, 30000);
       document.getElementById("status").textContent = "✅ Tilkoblet – trykk «Oppdater liste».";
     }
+
+    function clearObjectList() {
+      const panel = document.getElementById("objectListPanel");
+      panel.innerHTML = "";
+      panel.style.display = "none";
+    }
+
     function clearCharts() {
       charts.forEach(c => c.destroy());
       charts = [];
       document.getElementById("chartsContainer").innerHTML = "";
       lastSelections.clear();
+      clearObjectList();
     }
+
     function populatePropSelects(pset) {
       const selects = ["prop1","prop2","prop3","prop4"].map(id => document.getElementById(id));
       const cbs = ["cb1","cb2","cb3","cb4"].map(id => document.getElementById(id));
@@ -302,6 +343,7 @@
         sel.disabled = false;
       });
     }
+
     async function scanProperties() {
       clearCharts();
       document.getElementById("error").textContent = "";
@@ -337,6 +379,7 @@
       document.getElementById("loadButton").disabled = false;
       document.getElementById("resetButton").disabled = true;
     }
+
     async function getPropertyData(psetName, propName) {
       const counts = { withValue: 0, withoutValue: 0 };
       const selection = { withValue: {}, withoutValue: {} };
@@ -349,32 +392,139 @@
         const objProps = await API.viewer.getObjectProperties(modelId, runtimeIds);
         for (const obj of objProps) {
           let hasProp = false, hasVal = false;
-          let guid = null;
           for (const ps of obj.properties || []) {
+            if (ps.name !== psetName) continue;
             for (const p of ps.properties || []) {
-              if (p.name === 'GlobalId') {
-                guid = p.value;
-              }
-              if (p.name === propName) {
-                hasProp = true;
-                const v = p.value;
-                if (v !== null && v !== undefined && String(v).trim() !== "") hasVal = true;
-              }
+              if (p.name !== propName) continue;
+              hasProp = true;
+              const v = p.value;
+              if (v !== null && v !== undefined && String(v).trim() !== "") hasVal = true;
+              break;
             }
+            if (hasProp) break;
           }
           const key = hasProp && hasVal ? "withValue" : "withoutValue";
           counts[key]++;
           if (!selection[key][modelId]) selection[key][modelId] = [];
-          if (key === "withValue") {
-            selection[key][modelId].push(obj.id);
-          } else {
-            selection[key][modelId].push({ runtimeId: obj.id, guid: guid || 'Ukjent' });
-          }
+          selection[key][modelId].push(obj.id);
         }
       }
       return { counts, selection };
     }
-    function createPieChart(pset, prop, counts) {
+
+    /**
+     * Velg og zoom til gitt selector (brukes på wedge-klikk og liste-klikk)
+     */
+    async function selectAndZoom(selector, message) {
+      if (!selector || !selector.modelObjectIds || !selector.modelObjectIds.length) return;
+      try {
+        await API.viewer.setSelection(selector, "set");
+        await API.viewer.setCamera(selector, { animationTime: 0.8 });
+        if (message) {
+          document.getElementById("status").textContent = message;
+        }
+      } catch (e) {
+        document.getElementById("error").textContent = "Feil ved zoom/valg: " + e.message;
+      }
+    }
+
+    /**
+     * Bygg og vis listen over objekter uten verdi for valgt pset/prop
+     */
+    function showObjectList(pset, prop, perModel) {
+      const panel = document.getElementById("objectListPanel");
+      panel.innerHTML = "";
+
+      const allIds = [];
+      for (const modelId in perModel) {
+        const ids = perModel[modelId] || [];
+        ids.forEach(id => allIds.push({ modelId, id }));
+      }
+      const total = allIds.length;
+
+      const title = document.createElement("h3");
+      title.textContent = `${pset} → ${prop} – objekter uten verdi (${total} stk)`;
+      panel.appendChild(title);
+
+      const info = document.createElement("p");
+      info.textContent = "Klikk på en rad for å velge og zoome til det aktuelle objektet i modellen.";
+      panel.appendChild(info);
+
+      if (total === 0) {
+        const empty = document.createElement("p");
+        empty.textContent = "Ingen objekter uten verdi for denne property.";
+        panel.appendChild(empty);
+        panel.style.display = "block";
+        return;
+      }
+
+      const ul = document.createElement("ul");
+      allIds.forEach((entry, index) => {
+        const li = document.createElement("li");
+        li.className = "object-list-item";
+        li.title = `Model: ${entry.modelId} – RuntimeId: ${entry.id}`;
+
+        const spanLeft = document.createElement("span");
+        spanLeft.textContent = `#${index + 1}`;
+        const spanRight = document.createElement("span");
+        spanRight.textContent = `Modell: ${entry.modelId} – Obj: ${entry.id}`;
+
+        li.appendChild(spanLeft);
+        li.appendChild(spanRight);
+
+        li.onclick = async () => {
+          const selector = {
+            modelObjectIds: [
+              { modelId: entry.modelId, objectRuntimeIds: [entry.id] }
+            ]
+          };
+          await selectAndZoom(selector, `🔍 Zoomer til enkeltobjekt uten verdi (${pset} → ${prop})`);
+        };
+
+        ul.appendChild(li);
+      });
+
+      panel.appendChild(ul);
+      panel.style.display = "block";
+    }
+
+    /**
+     * Håndter klikk på "Uten verdi" i kakediagrammet
+     */
+    async function handleWithoutValueClick(key, pset, prop) {
+      const selection = lastSelections.get(key);
+      if (!selection || !selection.withoutValue) {
+        document.getElementById("error").textContent =
+          "Finner ikke lagret utvalg for objekter uten verdi.";
+        return;
+      }
+
+      const perModel = selection.withoutValue;
+      // Bygg selector for alle objekter uten verdi
+      const modelObjectIds = [];
+      for (const modelId in perModel) {
+        const ids = perModel[modelId];
+        if (ids && ids.length) {
+          modelObjectIds.push({ modelId, objectRuntimeIds: ids });
+        }
+      }
+
+      if (!modelObjectIds.length) {
+        document.getElementById("status").textContent =
+          `Ingen objekter uten verdi for ${pset} → ${prop}.`;
+        clearObjectList();
+        return;
+      }
+
+      const selector = { modelObjectIds };
+      await selectAndZoom(
+        selector,
+        `🔍 Markert og zoomet til alle objekter uten verdi for ${pset} → ${prop}`
+      );
+      showObjectList(pset, prop, perModel);
+    }
+
+    function createPieChart(pset, prop, counts, key) {
       const container = document.getElementById("chartsContainer");
       const card = document.createElement("div");
       card.className = "chart-card";
@@ -384,7 +534,9 @@
       const canvas = document.createElement("canvas");
       card.appendChild(canvas);
       container.appendChild(card);
+
       const total = counts.withValue + counts.withoutValue;
+
       const chart = new Chart(canvas, {
         type: "pie",
         data: {
@@ -422,20 +574,28 @@
             animateRotate: true,
             duration: 1200
           },
+          // <<< Ny: klikk-håndtering på kakestykke
           onClick: async (evt, elements) => {
-            if (elements.length > 0 && elements[0].index === 1) { // Uten verdi
-              await showWithoutValue(prop, card);
+            if (!elements || !elements.length) return;
+            const el = elements[0];
+            const label = chart.data.labels[el.index];
+            if (label === "Uten verdi") {
+              await handleWithoutValueClick(key, pset, prop);
             }
           }
         }
       });
       charts.push(chart);
     }
+
     async function loadAllCharts() {
       clearCharts();
       document.getElementById("error").textContent = "";
       const pset = document.getElementById("psetSelect").value;
-      if (!pset) return document.getElementById("error").textContent = "Velg et Property Set";
+      if (!pset) {
+        document.getElementById("error").textContent = "Velg et Property Set";
+        return;
+      }
       const selectedProps = [];
       for (let i = 1; i <= 4; i++) {
         const cb = document.getElementById(`cb${i}`);
@@ -448,26 +608,30 @@
         document.getElementById("error").textContent = "Huk av minst én property";
         return;
       }
-      document.getElementById("status").textContent = `📈 Laster ${selectedProps.length} diagrammer…`;
+      document.getElementById("status").textContent =
+        `📈 Laster ${selectedProps.length} diagrammer…`;
+
       for (const prop of selectedProps) {
         const { counts, selection } = await getPropertyData(pset, prop);
-        lastSelections.set(prop, selection);
-        createPieChart(pset, prop, counts);
+        const key = `${pset}::${prop}`;
+        lastSelections.set(key, selection);
+        createPieChart(pset, prop, counts, key);
       }
-      document.getElementById("status").textContent = `✅ ${selectedProps.length} kakediagrammer ferdig!`;
+      document.getElementById("status").textContent =
+        `✅ ${selectedProps.length} kakediagrammer ferdig!`;
       document.getElementById("colorizeButton").disabled = false;
       document.getElementById("resetButton").disabled = false;
     }
+
     async function colorizeAll() {
       await API.viewer.setObjectState(undefined, { color: "reset" });
-      for (const [prop, sel] of lastSelections) {
+      for (const [, sel] of lastSelections) {
         for (const state of ["withValue", "withoutValue"]) {
           const perModel = sel[state];
           const list = [];
           for (const modelId in perModel) {
-            const ids = state === "withValue" ? perModel[modelId] : perModel[modelId].map(o => o.runtimeId);
-            if (ids.length) {
-              list.push({ modelId, objectRuntimeIds: ids });
+            if (perModel[modelId].length) {
+              list.push({ modelId, objectRuntimeIds: perModel[modelId] });
             }
           }
           if (list.length === 0) continue;
@@ -477,68 +641,16 @@
           await API.viewer.setObjectState({ modelObjectIds: list }, { color: rgba });
         }
       }
-      document.getElementById("status").textContent = "🎨 Alle valgte properties er fargelagt i modellen";
+      document.getElementById("status").textContent =
+        "🎨 Alle valgte properties er fargelagt i modellen";
       document.getElementById("resetButton").disabled = false;
     }
-    async function showWithoutValue(prop, card) {
-      const sel = lastSelections.get(prop).withoutValue;
-      if (!sel) return;
-      const modelEntities = [];
-      const objects = [];
-      for (const modelId in sel) {
-        const objs = sel[modelId];
-        modelEntities.push({ modelId, objectRuntimeIds: objs.map(o => o.runtimeId) });
-        objs.forEach(o => objects.push({ modelId, runtimeId: o.runtimeId, guid: o.guid }));
-      }
-      if (modelEntities.length === 0) return;
-      await API.viewer.isolateEntities(modelEntities);
-      // Lag tabell
-      let tableContainer = card.querySelector('.object-table');
-      if (!tableContainer) {
-        tableContainer = document.createElement('div');
-        tableContainer.className = 'object-table';
-        card.appendChild(tableContainer);
-      }
-      tableContainer.innerHTML = '';
-      const table = document.createElement('table');
-      const thead = document.createElement('thead');
-      thead.innerHTML = '<tr><th>GUID (klikk for zoom)</th></tr>';
-      table.appendChild(thead);
-      const tbody = document.createElement('tbody');
-      objects.sort((a, b) => a.guid.localeCompare(b.guid));
-      for (const obj of objects) {
-        const tr = document.createElement('tr');
-        const td = document.createElement('td');
-        const a = document.createElement('a');
-        a.href = '#';
-        a.textContent = obj.guid;
-        a.onclick = async (e) => {
-          e.preventDefault();
-          await zoomToObject(obj.modelId, obj.runtimeId);
-        };
-        td.appendChild(a);
-        tr.appendChild(td);
-        tbody.appendChild(tr);
-      }
-      table.appendChild(tbody);
-      tableContainer.appendChild(table);
-      tableContainer.style.display = 'block';
-      document.getElementById("status").textContent = `🔍 Isolert og listet objekter uten verdi for ${prop}`;
-    }
-    async function zoomToObject(modelId, runtimeId) {
-      const selector = { modelObjectIds: [{ modelId, objectRuntimeIds: [runtimeId] }] };
-      await API.viewer.setCamera(selector);
-      document.getElementById("status").textContent = "🔎 Zoomet til valgt objekt";
-    }
+
     async function resetAll() {
       clearCharts();
       await API.viewer.setObjectState(undefined, { color: "reset" });
-      await API.viewer.isolateEntities([]); // Vis alle igjen
-      document.querySelectorAll('.object-table').forEach(t => {
-        t.innerHTML = '';
-        t.style.display = 'none';
-      });
-      document.getElementById("status").textContent = "🔄 Modellen er tilbakestilt til originalfarger!";
+      document.getElementById("status").textContent =
+        "🔄 Modellen er tilbakestilt til originalfarger!";
       document.getElementById("error").textContent = "";
       document.getElementById("loadButton").disabled = false;
       document.getElementById("colorizeButton").disabled = true;
@@ -546,6 +658,7 @@
       const pset = document.getElementById("psetSelect").value;
       populatePropSelects(pset);
     }
+
     // Events
     document.getElementById("scanButton").onclick = scanProperties;
     document.getElementById("loadButton").onclick = loadAllCharts;
@@ -556,9 +669,11 @@
       populatePropSelects(e.target.value);
       document.getElementById("resetButton").disabled = true;
     };
+
     // Start
     connect().catch(e => {
-      document.getElementById("error").textContent = "Kunne ikke koble til Trimble Connect: " + e.message;
+      document.getElementById("error").textContent =
+        "Kunne ikke koble til Trimble Connect: " + e.message;
     });
   </script>
 </body>
