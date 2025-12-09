@@ -2,9 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8" />
-  <title>MultiProperty Checker</title>
-  NORCONSULT
-  Utviklet av: Edin Dzakmic</title>
+  <title>Multi-Property Kakediagrammer (opptil 4)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -293,14 +291,16 @@
     <div id="status">Kobler til Trimble Connect…</div>
     <div id="error"></div>
     <div id="chartsContainer"></div>
-    <div class="footer-credit">Norconsult – Property completeness-oversikt direkte i modellen</div>
+    <div class="footer-credit">
+      Norconsult – Property completeness-oversikt direkte i modellen (klikk på kakediagram for CSV-eksport)
+    </div>
   </main>
 
   <script>
     let API = null;
     let availableProps = {};
     let charts = [];
-    let lastSelections = new Map();
+    let lastSelections = new Map(); // kun for fargelegging
 
     const COLORS = {
       withValue: "rgb(46, 204, 113)",
@@ -359,7 +359,7 @@
       charts.forEach(c => c.destroy());
       charts = [];
       els.chartsContainer.innerHTML = "";
-      lastSelections.clear();
+      // Vi beholder lastSelections slik at farger kan resettes uavhengig
     }
 
     function resetPropertySelectors() {
@@ -463,12 +463,14 @@
       }
     }
 
+    // Ny helper: hent detaljert informasjon om objekter (for CSV)
     async function getPropertyData(psetName, propName) {
       const counts = { withValue: 0, withoutValue: 0 };
-      const selection = { withValue: {}, withoutValue: {} };
+      const selection = { withValue: {}, withoutValue: {} }; // for fargelegging
+      const details = { withValue: {}, withoutValue: {} };   // for CSV-eksport
 
       const models = await API.viewer.getObjects();
-      if (!models || !models.length) return { counts, selection };
+      if (!models || !models.length) return { counts, selection, details };
 
       for (const m of models) {
         const modelId = m.modelId || m.modelid || m["model Id"];
@@ -483,35 +485,122 @@
         for (const obj of objProps || []) {
           let hasProp = false;
           let hasVal = false;
+          const psetProps = {}; // alle properties fra valgt Property Set
 
           for (const ps of obj.properties || []) {
             if (ps.name !== psetName) continue;
+
             for (const p of ps.properties || []) {
-              if (p.name !== propName) continue;
-              hasProp = true;
-              const v = p.value;
-              if (v !== null && v !== undefined && String(v).trim() !== "") {
-                hasVal = true;
+              const pname = p.name;
+              const val = p.value;
+              psetProps[pname] = val;
+
+              if (pname === propName) {
+                hasProp = true;
+                if (val !== null && val !== undefined && String(val).trim() !== "") {
+                  hasVal = true;
+                }
               }
-              break;
             }
-            if (hasProp) break;
           }
 
           const key = hasProp && hasVal ? "withValue" : "withoutValue";
           counts[key]++;
 
-          if (!selection[key][modelId]) {
-            selection[key][modelId] = [];
-          }
+          if (!selection[key][modelId]) selection[key][modelId] = [];
           selection[key][modelId].push(obj.id);
+
+          const objectInfo = {
+            modelId,
+            runtimeId: obj.id,
+            name: obj.name || obj.objectName || "",
+            guid: obj.guid || obj.GlobalId || "",
+            properties: psetProps
+          };
+
+          if (!details[key][modelId]) details[key][modelId] = [];
+          details[key][modelId].push(objectInfo);
         }
       }
 
-      return { counts, selection };
+      return { counts, selection, details };
     }
 
-    function createPieChart(pset, prop, counts) {
+    // CSV helper
+    function escapeCSV(value) {
+      if (value === null || value === undefined) return "";
+      const str = String(value);
+      if (/[;\n\r"]/.test(str)) {
+        return '"' + str.replace(/"/g, '""') + '"';
+      }
+      return str;
+    }
+
+    function exportSliceToCSV(pset, prop, sliceType, detailPerModel) {
+      const objects = [];
+      for (const modelId in detailPerModel) {
+        const arr = detailPerModel[modelId] || [];
+        arr.forEach(o => objects.push(o));
+      }
+
+      if (!objects.length) {
+        showError("Ingen objekter å eksportere for valgt kakestykke.");
+        return;
+      }
+
+      // Samle alle property-navn som forekommer i dette Property Set-et
+      const allPropNamesSet = new Set();
+      objects.forEach(o => {
+        Object.keys(o.properties || {}).forEach(pn => allPropNamesSet.add(pn));
+      });
+
+      const allPropNames = Array.from(allPropNamesSet).sort((a, b) => a.localeCompare(b, "nb"));
+
+      const baseCols = ["ModelId", "RuntimeId", "ObjectName", "ObjectGuid", "SliceType", "PropertySet"];
+      const header = baseCols.concat(allPropNames);
+
+      const rows = [];
+      rows.push(header.join(";"));
+
+      const sliceLabel = sliceType === "withValue" ? "Med verdi" : "Uten verdi";
+
+      objects.forEach(o => {
+        const row = {
+          ModelId: o.modelId || "",
+          RuntimeId: o.runtimeId || "",
+          ObjectName: o.name || "",
+          ObjectGuid: o.guid || "",
+          SliceType: sliceLabel,
+          PropertySet: pset
+        };
+
+        allPropNames.forEach(pn => {
+          row[pn] = (o.properties && pn in o.properties) ? o.properties[pn] : "";
+        });
+
+        const rowValues = header.map(col => escapeCSV(row[col]));
+        rows.push(rowValues.join(";"));
+      });
+
+      const csvContent = rows.join("\r\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const sliceShort = sliceType === "withValue" ? "medVerdi" : "utenVerdi";
+      link.href = url;
+      link.download = `TC_${pset}_${prop}_${sliceShort}_${dateStr}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      els.status.textContent = `📤 Eksporterte ${objects.length} objekter til CSV (${sliceLabel}) for ${pset} → ${prop}.`;
+      showError("");
+    }
+
+    function createPieChart(pset, prop, counts, details) {
       const total = counts.withValue + counts.withoutValue;
       const container = els.chartsContainer;
 
@@ -532,7 +621,8 @@
       const pctWithout = total ? ((counts.withoutValue / total) * 100).toFixed(1) : "0.0";
       summary.textContent =
         `Totalt ${total} objekter • Med verdi: ${counts.withValue} (${pctWith} %) • ` +
-        `Uten verdi/mangler property: ${counts.withoutValue} (${pctWithout} %)`;
+        `Uten verdi/mangler property: ${counts.withoutValue} (${pctWithout} %). ` +
+        `Klikk på en kakedel for å eksportere objektene til CSV.`;
       card.appendChild(summary);
 
       container.appendChild(card);
@@ -573,6 +663,15 @@
           animation: {
             animateRotate: true,
             duration: 900
+          },
+          // Klikk på kakediagram -> eksport til CSV
+          onClick: (evt, elements) => {
+            if (!elements.length) return;
+            const idx = elements[0].index;
+            const sliceType = idx === 0 ? "withValue" : "withoutValue";
+            const detailPerModel = details[sliceType] || {};
+
+            exportSliceToCSV(pset, prop, sliceType, detailPerModel);
           }
         }
       });
@@ -616,12 +715,13 @@
 
       try {
         for (const prop of selectedProps) {
-          const { counts, selection } = await getPropertyData(pset, prop);
-          lastSelections.set(prop, selection);
-          createPieChart(pset, prop, counts);
+          const { counts, selection, details } = await getPropertyData(pset, prop);
+          lastSelections.set(prop, selection); // fortsatt brukt for fargelegging
+          createPieChart(pset, prop, counts, details);
         }
 
-        els.status.textContent = `✅ ${selectedProps.length} kakediagram ferdig! Bruk «Fargelegg alle» for å se dem i modellen.`;
+        els.status.textContent = `✅ ${selectedProps.length} kakediagram ferdig! ` +
+          `Klikk på kakediagram for CSV-eksport, eller bruk «Fargelegg alle» i modellen.`;
         els.colorizeButton.disabled = false;
         els.resetButton.disabled = false;
       } catch (e) {
@@ -667,7 +767,8 @@
           }
         }
 
-        els.status.textContent = "🎨 Alle valgte properties er fargelagt i modellen (grønn = med verdi, rød = uten verdi/mangler).";
+        els.status.textContent =
+          "🎨 Alle valgte properties er fargelagt i modellen (grønn = med verdi, rød = uten verdi/mangler).";
         els.resetButton.disabled = false;
       } catch (e) {
         showError("Feil ved fargelegging: " + (e && e.message ? e.message : e));
@@ -686,7 +787,8 @@
 
       try {
         await API.viewer.setObjectState(undefined, { color: "reset" });
-        els.status.textContent = "🔄 Modellen er tilbakestilt til originalfarger. Du kan fortsatt generere nye kakediagram med samme valg.";
+        els.status.textContent =
+          "🔄 Modellen er tilbakestilt til originalfarger. Du kan fortsatt generere nye kakediagram med samme valg.";
       } catch (e) {
         showError("Feil ved tilbakestilling av modellfarger: " + (e && e.message ? e.message : e));
         els.status.textContent = "❌ Klarte ikke å tilbakestille modellfarger.";
@@ -698,7 +800,7 @@
       }
     }
 
-    // Checkbox → disable/enable tilhørende select (for litt bedre UX)
+    // Checkbox → ekstra UX (rydder verdi hvis man skrur av)
     cbIds.forEach((cbId, index) => {
       const cb = document.getElementById(cbId);
       const sel = document.getElementById(propSelectIds[index]);
@@ -729,5 +831,3 @@
   </script>
 </body>
 </html>
-
-
